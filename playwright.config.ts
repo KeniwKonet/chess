@@ -5,7 +5,7 @@ export default defineConfig({
   timeout: 90_000,
   workers: 1,
   use: {
-    baseURL: 'http://localhost:4173/',
+    baseURL: process.env.BASE_URL ?? 'http://localhost:4173/',
     launchOptions: {
       // Software WebGL so the tests run on machines without a GPU (slow, but deterministic).
       args: ['--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist'],
@@ -14,7 +14,7 @@ export default defineConfig({
   },
   webServer: {
     command: 'pnpm --filter @cr/web build && pnpm --filter @cr/web preview --port 4173 --strictPort',
-    port: 4173,
+    port: Number(process.env.PORT ?? 4173),
     reuseExistingServer: true,
     timeout: 120_000,
   },

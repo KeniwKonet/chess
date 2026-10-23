@@ -8,6 +8,7 @@ import { CIRCUMRADIUS, toWorld } from '@cr/game-core';
 import { realm, buildingModel } from '../game';
 import { cam, flyTo } from '../camera/camera';
 import { useUi } from '../state/ui';
+import { game, renderPos } from '../sim/runner';
 
 const W = 232;
 const PAD = 6;
@@ -88,6 +89,15 @@ export function Minimap() {
       g.setTransform(1, 0, 0, 1, 0, 0);
       g.drawImage(base, 0, 0);
       g.scale(dpr, dpr);
+      // Soldiers (no fog of war yet, so Moon units show too).
+      const sel = new Set(useUi.getState().selectedUnits);
+      for (const u of game.sim.units) {
+        if (u.hp <= 0) continue;
+        const p = renderPos(u);
+        const m = toMap(p.x, p.z);
+        g.fillStyle = sel.has(u.id) ? '#FFFFFF' : u.side === 'sun' ? '#FFD45E' : '#7FB2FF';
+        g.fillRect(m.x - 1.5, m.y - 1.5, 3, 3);
+      }
       const fp = cam.footprint;
       if (fp.length === 4) {
         g.beginPath();

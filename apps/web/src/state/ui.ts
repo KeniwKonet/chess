@@ -18,6 +18,11 @@ export interface LogEntry {
 interface UiState {
   selected: Pick;
   hovered: Pick;
+  /** Selected soldiers by id (player's or, for inspection only, the enemy's). */
+  selectedUnits: number[];
+  hoveredUnit: number | null;
+  /** Bumped when unit state worth re-reading changes (order, arrival), so panels refresh. */
+  unitRev: number;
   quality: Quality;
   showPerf: boolean;
   showHelp: boolean;
@@ -26,6 +31,9 @@ interface UiState {
   assetsFailed: boolean;
   log: LogEntry[];
   select: (p: Pick) => void;
+  selectUnits: (ids: number[]) => void;
+  hoverUnit: (id: number | null) => void;
+  bumpUnits: () => void;
   hover: (p: Pick) => void;
   setQuality: (q: Quality) => void;
   toggle: (k: 'showPerf' | 'showHelp' | 'showLabels' | 'edgeScroll') => void;
@@ -50,7 +58,14 @@ export const useUi = create<UiState>((set) => ({
   edgeScroll: false,
   assetsFailed: false,
   log: [],
-  select: (p) => set((s) => (same(s.selected, p) ? s : { selected: p })),
+  selectedUnits: [],
+  hoveredUnit: null,
+  unitRev: 0,
+  // Selecting a building or tile clears unit selection, and vice versa.
+  select: (p) => set((s) => (same(s.selected, p) && (!p || !s.selectedUnits.length) ? s : { selected: p, selectedUnits: p ? [] : s.selectedUnits })),
+  selectUnits: (ids) => set((s) => ({ selectedUnits: ids, selected: ids.length ? null : s.selected })),
+  hoverUnit: (id) => set((s) => (s.hoveredUnit === id ? s : { hoveredUnit: id })),
+  bumpUnits: () => set((s) => ({ unitRev: s.unitRev + 1 })),
   hover: (p) => set((s) => (same(s.hovered, p) ? s : { hovered: p })),
   setQuality: (quality) => set({ quality }),
   toggle: (k) => set((s) => ({ [k]: !s[k] }) as Partial<UiState>),
@@ -60,3 +75,11 @@ export const useUi = create<UiState>((set) => ({
 }));
 
 export const IS_MOBILE = isMobile;
+
+declare global {
+  interface Window {
+    __crUi?: () => number[];
+  }
+}
+/** Test hook: the current unit selection. */
+if (typeof window !== 'undefined') window.__crUi = () => useUi.getState().selectedUnits;

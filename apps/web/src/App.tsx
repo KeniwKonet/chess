@@ -10,14 +10,20 @@ import { CameraRig } from './camera/CameraRig';
 import { Overlay, OverlayProjector } from './hud/Overlay';
 import { Hud } from './hud/Hud';
 import { PerfProbe } from './hud/perf';
+import { Units, UnitMarks, SimDriver } from './units/Units';
+import { BoxSelect } from './hud/BoxSelect';
 
-class AssetBoundary extends Component<{ children: ReactNode; fallback: ReactNode }, { failed: boolean }> {
+class AssetBoundary extends Component<{ children: ReactNode; fallback: ReactNode; what?: string }, { failed: boolean }> {
   state = { failed: false };
   static getDerivedStateFromError() {
     return { failed: true };
   }
   componentDidCatch(err: unknown) {
-    console.error('[ChessRealms] model kit failed to load', err);
+    console.error('[ChessRealms] assets failed to load', err);
+    if (this.props.what) {
+      useUi.getState().addLog(this.props.what, 'system');
+      return;
+    }
     useUi.getState().setAssetsFailed(true);
     useUi.getState().addLog('3D models failed to load. Showing a simplified map.', 'system');
   }
@@ -61,6 +67,13 @@ export function App() {
             <Ready />
           </Suspense>
         </AssetBoundary>
+        <AssetBoundary fallback={null} what="Soldier models failed to load. Units are shown as chess tokens.">
+          <Suspense fallback={null}>
+            <Units />
+          </Suspense>
+        </AssetBoundary>
+        <UnitMarks />
+        <SimDriver />
         <CaptureRings />
         <SelectionMarkers />
         <WindClock />
@@ -69,6 +82,7 @@ export function App() {
         <PerfProbe />
       </Canvas>
       <Overlay />
+      <BoxSelect />
       <Hud />
       <Loading failed={failed} />
     </div>
