@@ -79,7 +79,7 @@ button { font: inherit; color: inherit; }
 .chip-proto { background: rgba(232, 179, 58, 0.14); color: var(--sun); border: 1px solid rgba(232, 179, 58, 0.5); }
 
 /* ---------- HUD layout ---------- */
-.hud { position: absolute; inset: 0; pointer-events: none; }
+.hud { position: absolute; inset: env(safe-area-inset-top, 0px) env(safe-area-inset-right, 0px) env(safe-area-inset-bottom, 0px) env(safe-area-inset-left, 0px); pointer-events: none; }
 .hud > *, .hud .bottom-left > * { pointer-events: auto; }
 .hud .bottom-left { pointer-events: none; }
 

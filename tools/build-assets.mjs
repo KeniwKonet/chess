@@ -11,7 +11,7 @@
  */
 import { NodeIO } from '@gltf-transform/core';
 import { ALL_EXTENSIONS } from '@gltf-transform/extensions';
-import { dedup, prune, mergeDocuments, unpartition, meshopt, weld, simplify } from '@gltf-transform/functions';
+import { dedup, prune, mergeDocuments, unpartition, meshopt, weld, simplify, quantize } from '@gltf-transform/functions';
 import { MeshoptEncoder, MeshoptSimplifier } from 'meshoptimizer';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -19,7 +19,7 @@ import { fileURLToPath } from 'node:url';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const SRC = process.argv[2] ?? '/home/claude/vendor/hex/addons/kaykit_medieval_hexagon_pack/Assets/gltf';
-const OUT = path.join(here, '../apps/web/public/assets/kit.glb');
+const OUT = process.env.KIT_OUT ?? path.join(here, '../apps/web/public/assets/kit.glb');
 const MANIFEST = path.join(here, '../apps/web/src/assets/kit-manifest.json');
 
 const colours = ['blue', 'yellow'];
@@ -104,7 +104,8 @@ for (const s of doc.getRoot().listScenes()) if (s !== scene) s.dispose();
 const atlas = fs.readFileSync(path.join(here, 'atlas512.png'));
 for (const tex of doc.getRoot().listTextures()) tex.setImage(atlas).setMimeType('image/png').setURI('atlas.png');
 
-await doc.transform(dedup(), weld(), prune(), unpartition(), meshopt({ encoder: MeshoptEncoder, level: 'medium' }));
+// PLAIN=1 skips meshopt compression (bigger file, no WebAssembly decoder needed at runtime).
+await doc.transform(dedup(), weld(), prune(), unpartition(), ...(process.env.PLAIN ? [quantize()] : [meshopt({ encoder: MeshoptEncoder, level: 'medium' })]));
 
 for (const node of scene.listChildren()) {
   let tris = 0;
@@ -114,7 +115,16 @@ for (const node of scene.listChildren()) {
   });
   manifest[node.getName()] = { tris };
 }
-await io.write(OUT, doc);
+if (OUT.endsWith('.json')) {
+  // Self-contained glTF JSON with embedded buffers and texture, for hosts that only serve common web types.
+  const { json, resources } = await io.writeJSON(doc, { format: 'gltf' });
+  const toData = (bytes, mime) => `data:${mime};base64,${Buffer.from(bytes).toString('base64')}`;
+  for (const b of json.buffers ?? []) b.uri = toData(resources[b.uri], 'application/octet-stream');
+  for (const im of json.images ?? []) if (im.uri) im.uri = toData(resources[im.uri], im.mimeType ?? 'image/png');
+  fs.writeFileSync(OUT, JSON.stringify(json));
+} else {
+  await io.write(OUT, doc);
+}
 fs.mkdirSync(path.dirname(MANIFEST), { recursive: true });
-fs.writeFileSync(MANIFEST, JSON.stringify(manifest, null, 1));
+if (!process.env.KIT_OUT) fs.writeFileSync(MANIFEST, JSON.stringify(manifest, null, 1));
 console.log(`Wrote ${OUT} (${(fs.statSync(OUT).size / 1024).toFixed(0)} KB), ${Object.keys(manifest).length} models, textures: ${doc.getRoot().listTextures().length}`);

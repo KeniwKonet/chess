@@ -24,7 +24,8 @@ export interface Kit {
   has: (model: string) => boolean;
 }
 
-export const KIT_URL = `${import.meta.env.BASE_URL}assets/kit.glb`;
+/** kit.glb by default; set VITE_KIT_FILE=kit.json for hosts that only serve common web file types. */
+export const KIT_URL = `${import.meta.env.BASE_URL}assets/${import.meta.env.VITE_KIT_FILE ?? 'kit.glb'}`;
 
 /** Shared time uniform for animated materials. */
 export const windTime = { value: 0 };

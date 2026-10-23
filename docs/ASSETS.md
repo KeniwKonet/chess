@@ -25,6 +25,15 @@ The packs were taken from the author's public GitHub mirrors, `KayKit-Game-Asset
 
 Result: `kit.glb` is 1.6 MB with 117 models and one texture.
 
+For hosts that only serve common web file types, build a self-contained JSON kit instead:
+
+```bash
+PLAIN=1 KIT_OUT=apps/web/public/assets/kit.json node tools/build-assets.mjs
+VITE_KIT_FILE=kit.json pnpm build
+```
+
+This version uses standard mesh quantisation instead of meshopt, so no WebAssembly decoder is needed. It comes to 4.2 MB with the buffers embedded. The hosted milestone 1 preview uses it.
+
 ## Animation: what the assets really have
 
 - **Buildings have no animation clips.** Windmill fans, watermill wheels and catapult turrets are separate nodes in the models. The game turns them in code, which is procedural motion rather than an authored animation.
