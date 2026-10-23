@@ -1,0 +1,353 @@
+{
+ "hex_water": {
+  "tris": 24
+ },
+ "hex_river_A": {
+  "tris": 82
+ },
+ "hex_river_B": {
+  "tris": 186
+ },
+ "hex_river_C": {
+  "tris": 192
+ },
+ "hex_river_D": {
+  "tris": 226
+ },
+ "hex_river_E": {
+  "tris": 188
+ },
+ "hex_river_F": {
+  "tris": 188
+ },
+ "hex_river_G": {
+  "tris": 242
+ },
+ "hex_river_H": {
+  "tris": 274
+ },
+ "hex_river_I": {
+  "tris": 274
+ },
+ "hex_river_J": {
+  "tris": 234
+ },
+ "hex_river_K": {
+  "tris": 322
+ },
+ "hex_river_L": {
+  "tris": 384
+ },
+ "hex_river_crossing_A": {
+  "tris": 134
+ },
+ "hex_river_crossing_B": {
+  "tris": 134
+ },
+ "hex_road_A": {
+  "tris": 58
+ },
+ "hex_road_B": {
+  "tris": 118
+ },
+ "hex_road_C": {
+  "tris": 124
+ },
+ "hex_road_D": {
+  "tris": 160
+ },
+ "hex_road_E": {
+  "tris": 136
+ },
+ "hex_road_F": {
+  "tris": 136
+ },
+ "hex_road_G": {
+  "tris": 148
+ },
+ "hex_road_H": {
+  "tris": 190
+ },
+ "hex_road_I": {
+  "tris": 190
+ },
+ "hex_road_J": {
+  "tris": 166
+ },
+ "hex_road_K": {
+  "tris": 220
+ },
+ "hex_road_L": {
+  "tris": 264
+ },
+ "hex_road_M": {
+  "tris": 94
+ },
+ "building_castle_blue": {
+  "tris": 5659
+ },
+ "building_castle_yellow": {
+  "tris": 5659
+ },
+ "building_barracks_blue": {
+  "tris": 4007
+ },
+ "building_barracks_yellow": {
+  "tris": 4007
+ },
+ "building_archeryrange_blue": {
+  "tris": 3819
+ },
+ "building_archeryrange_yellow": {
+  "tris": 3819
+ },
+ "building_tavern_blue": {
+  "tris": 2992
+ },
+ "building_tavern_yellow": {
+  "tris": 2992
+ },
+ "building_windmill_blue": {
+  "tris": 2653
+ },
+ "building_windmill_yellow": {
+  "tris": 2653
+ },
+ "building_mine_blue": {
+  "tris": 1126
+ },
+ "building_mine_yellow": {
+  "tris": 1126
+ },
+ "building_lumbermill_blue": {
+  "tris": 3170
+ },
+ "building_lumbermill_yellow": {
+  "tris": 3170
+ },
+ "building_blacksmith_blue": {
+  "tris": 2410
+ },
+ "building_blacksmith_yellow": {
+  "tris": 2410
+ },
+ "building_tower_catapult_blue": {
+  "tris": 2864
+ },
+ "building_tower_catapult_yellow": {
+  "tris": 2864
+ },
+ "building_tower_A_blue": {
+  "tris": 2138
+ },
+ "building_tower_A_yellow": {
+  "tris": 2138
+ },
+ "building_tower_B_blue": {
+  "tris": 2418
+ },
+ "building_tower_B_yellow": {
+  "tris": 2418
+ },
+ "building_watermill_blue": {
+  "tris": 1921
+ },
+ "building_watermill_yellow": {
+  "tris": 1921
+ },
+ "building_home_A_blue": {
+  "tris": 1011
+ },
+ "building_home_A_yellow": {
+  "tris": 1011
+ },
+ "building_home_B_blue": {
+  "tris": 1393
+ },
+ "building_home_B_yellow": {
+  "tris": 1393
+ },
+ "building_market_blue": {
+  "tris": 3125
+ },
+ "building_market_yellow": {
+  "tris": 3125
+ },
+ "building_grain": {
+  "tris": 230
+ },
+ "building_bridge_A": {
+  "tris": 604
+ },
+ "building_scaffolding": {
+  "tris": 2672
+ },
+ "building_stage_B": {
+  "tris": 902
+ },
+ "building_destroyed": {
+  "tris": 882
+ },
+ "trees_A_large": {
+  "tris": 864
+ },
+ "trees_B_large": {
+  "tris": 1540
+ },
+ "trees_A_medium": {
+  "tris": 480
+ },
+ "trees_B_medium": {
+  "tris": 1100
+ },
+ "tree_single_A": {
+  "tris": 50
+ },
+ "tree_single_B": {
+  "tris": 220
+ },
+ "mountain_A_grass_trees": {
+  "tris": 468
+ },
+ "mountain_B_grass_trees": {
+  "tris": 558
+ },
+ "mountain_C_grass": {
+  "tris": 480
+ },
+ "mountain_A_grass": {
+  "tris": 288
+ },
+ "mountain_B": {
+  "tris": 120
+ },
+ "hills_A_trees": {
+  "tris": 518
+ },
+ "hills_B_trees": {
+  "tris": 406
+ },
+ "hills_C": {
+  "tris": 238
+ },
+ "hills_A": {
+  "tris": 383
+ },
+ "hills_B": {
+  "tris": 226
+ },
+ "rock_single_A": {
+  "tris": 18
+ },
+ "rock_single_B": {
+  "tris": 26
+ },
+ "rock_single_C": {
+  "tris": 40
+ },
+ "rock_single_D": {
+  "tris": 22
+ },
+ "rock_single_E": {
+  "tris": 71
+ },
+ "barrel": {
+  "tris": 240
+ },
+ "crate_A_big": {
+  "tris": 132
+ },
+ "flag_blue": {
+  "tris": 48
+ },
+ "flag_yellow": {
+  "tris": 48
+ },
+ "cloud_big": {
+  "tris": 672
+ },
+ "cloud_small": {
+  "tris": 366
+ },
+ "wall_straight": {
+  "tris": 504
+ },
+ "wall_corner_A_outside": {
+  "tris": 414
+ },
+ "wall_corner_A_inside": {
+  "tris": 364
+ },
+ "tent": {
+  "tris": 86
+ },
+ "weaponrack": {
+  "tris": 42
+ },
+ "sack": {
+  "tris": 92
+ },
+ "wheelbarrow": {
+  "tris": 396
+ },
+ "trees_A_large__lite": {
+  "tris": 864
+ },
+ "trees_B_large__lite": {
+  "tris": 964
+ },
+ "trees_A_medium__lite": {
+  "tris": 480
+ },
+ "trees_B_medium__lite": {
+  "tris": 688
+ },
+ "tree_single_B__lite": {
+  "tris": 156
+ },
+ "mountain_A_grass_trees__lite": {
+  "tris": 432
+ },
+ "mountain_B_grass_trees__lite": {
+  "tris": 522
+ },
+ "hills_A_trees__lite": {
+  "tris": 478
+ },
+ "hills_B_trees__lite": {
+  "tris": 382
+ },
+ "building_castle_blue__lite": {
+  "tris": 4313
+ },
+ "building_castle_yellow__lite": {
+  "tris": 4313
+ },
+ "building_barracks_blue__lite": {
+  "tris": 3151
+ },
+ "building_barracks_yellow__lite": {
+  "tris": 3151
+ },
+ "building_archeryrange_blue__lite": {
+  "tris": 2695
+ },
+ "building_archeryrange_yellow__lite": {
+  "tris": 2695
+ },
+ "building_tower_A_blue__lite": {
+  "tris": 1520
+ },
+ "building_tower_A_yellow__lite": {
+  "tris": 1520
+ },
+ "building_lumbermill_blue__lite": {
+  "tris": 2503
+ },
+ "building_lumbermill_yellow__lite": {
+  "tris": 2503
+ },
+ "hex_grass": {
+  "tris": 36
+ }
+}

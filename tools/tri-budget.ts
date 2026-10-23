@@ -1,0 +1,11 @@
+import { buildRealm } from '../packages/game-core/src/index';
+import manifest from '../apps/web/src/assets/kit-manifest.json' with { type: 'json' };
+import { layout } from '../apps/web/src/world/layout';
+const l = layout(buildRealm());
+const count = new Map<string, number>();
+for (const p of [...l.tiles, ...l.props, ...l.buildings, ...l.animated]) count.set(p.model, (count.get(p.model) ?? 0) + 1);
+const rows = [...count].map(([m, n]) => ({ m, n, t: (manifest as Record<string, { tris: number }>)[m]!.tris, total: n * (manifest as Record<string, { tris: number }>)[m]!.tris }));
+rows.sort((a, b) => b.total - a.total);
+let sum = 0; for (const r of rows) sum += r.total;
+console.log('models', rows.length, 'total tris', sum);
+for (const r of rows.slice(0, 18)) console.log(r.m.padEnd(28), String(r.n).padStart(4), '×', String(r.t).padStart(5), '=', r.total);

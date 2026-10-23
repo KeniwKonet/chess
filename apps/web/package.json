@@ -1,0 +1,24 @@
+{
+  "name": "@cr/web",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": { "dev": "vite", "build": "vite build", "preview": "vite preview" },
+  "dependencies": {
+    "@cr/game-core": "workspace:*",
+    "@cr/chess-core": "workspace:*",
+    "three": "0.186.1",
+    "@react-three/fiber": "9.8.2",
+    
+    "react": "19.3.1",
+    "react-dom": "19.3.1",
+    "zustand": "5.0.16"
+  },
+  "devDependencies": {
+    "@types/three": "0.186.0",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "vite": "8.3.5",
+    "@vitejs/plugin-react": "6.1.2"
+  }
+}
