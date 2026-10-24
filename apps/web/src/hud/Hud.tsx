@@ -7,6 +7,7 @@ import { zoomAt, clampPose } from '../camera/rts';
 import { focusPick } from '../camera/CameraRig';
 import { Minimap } from './Minimap';
 import { perf } from './perf';
+import { UnitPanel, ArmyBar } from './UnitPanel';
 
 const fmt = (n: number) => n.toLocaleString('en-GB');
 const clock = (t: number) => `${String(Math.floor(t / 60)).padStart(2, '0')}:${String(Math.floor(t % 60)).padStart(2, '0')}`;
@@ -21,7 +22,9 @@ export function Hud() {
         <Minimap />
         <CamButtons />
       </div>
+      <ArmyBar />
       <SelectionPanel />
+      <UnitPanel />
       <FieldLog />
       <Help />
       <PerfPanel />
@@ -37,8 +40,8 @@ function TopLeft() {
         <div className="brand-name">Chess Realms</div>
         <div className="brand-sub">The Ashen Divide · Sun vs Moon</div>
       </div>
-      <span className="chip chip-proto" title="Milestone 1: terrain, buildings, lighting and camera. Units, combat and the War Table come in later milestones.">
-        Milestone 1 build
+      <span className="chip chip-proto" title="Milestone 2: battlefield, units, selection, orders and pathfinding. Combat, economy and the War Table come in later milestones.">
+        Milestone 2 build
       </span>
     </div>
   );
@@ -171,7 +174,7 @@ function SelectionPanel() {
           : `Passable. Movement cost ${cost.toFixed(1)}× ${cost < 1 ? '(roads are faster)' : cost > 1 ? '(slower going)' : '(normal)'}.`}
         {c.ford ? ' The Ford of Ash is the only place the river can be waded.' : ''}
       </p>
-      <p className="sel-foot">Movement costs are real map data; units that use them arrive in milestone 2.</p>
+      <p className="sel-foot">Soldiers use these costs when they plan a march: roads speed them up, forest and the ford slow them down.</p>
     </section>
   );
 }
@@ -209,15 +212,19 @@ function Help() {
   const edgeScroll = useUi((s) => s.edgeScroll);
   if (!show) return null;
   const rows: [string, string][] = [
-    ['Drag', 'Pan. The ground stays under your pointer'],
+    ['Click a soldier', 'Select it. Shift-click adds or removes'],
+    ['Left-drag', 'Box-select your soldiers (Shift adds)'],
+    ['Double-click a soldier', 'Select all of that type in view'],
+    ['Right-click', 'Send selected soldiers there'],
+    ['Tap (touch)', 'Select, or send selected soldiers there'],
+    ['X', 'Stop and hold position'],
+    ['Ctrl+A · Ctrl+1–9 · 1–9', 'Select all · set group · recall group (twice to jump)'],
+    ['Right-drag · one finger', 'Pan. The ground stays under your pointer'],
     ['Wheel · pinch', 'Zoom toward the pointer'],
-    ['Middle-drag · Shift-drag · two-finger twist', 'Rotate'],
+    ['Middle-drag · Alt-drag · two-finger twist · Q/E', 'Rotate'],
     ['W A S D · arrows', 'Pan'],
-    ['Q · E', 'Rotate'],
-    ['+ · −', 'Zoom'],
-    ['Click', 'Inspect a building or tile'],
-    ['Double-click · F', 'Focus the camera on the selection'],
-    ['H · O · N', 'Sunspire · overview · face north'],
+    ['Click a building or tile', 'Inspect it'],
+    ['F · H · O · N', 'Focus selection · Sunspire · overview · face north'],
     ['L · ` · Esc', 'Labels · stats · clear selection'],
   ];
   return (
@@ -240,7 +247,7 @@ function Help() {
             Edge panning {edgeScroll ? 'on' : 'off'}
           </button>
         </div>
-        <p className="sel-foot">Once units arrive (milestone 2), left-drag will box-select and right-drag will pan.</p>
+        <p className="sel-foot">Zoomed far out, soldiers show as chess pieces: pawns are infantry, bishops are archers.</p>
       </section>
     </div>
   );

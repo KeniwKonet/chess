@@ -5,7 +5,7 @@
 | Pack | Author | Licence | Used for |
 | --- | --- | --- | --- |
 | KayKit Medieval Hexagon Pack 1.0 | Kay Lousberg | CC0 1.0 | Terrain tiles, rivers, roads, buildings, nature, props |
-| KayKit Adventurers Character Pack 1.0 | Kay Lousberg | CC0 1.0 | Soldiers (milestone 2, not yet in the build) |
+| KayKit Adventurers Character Pack 1.0 | Kay Lousberg | CC0 1.0 | Soldiers: Knight (infantry), Rogue (archers) |
 
 The licence files are copied in [licenses/](licenses/). CC0 needs no attribution, but we credit the author anyway.
 
@@ -34,11 +34,27 @@ VITE_KIT_FILE=kit.json pnpm build
 
 This version uses standard mesh quantisation instead of meshopt, so no WebAssembly decoder is needed. It comes to 4.2 MB with the buffers embedded. The hosted milestone 1 preview uses it.
 
+### Soldiers
+
+1. `python3 tools/make-unit-textures.py`: recolours the team swatches to Sun gold and Moon blue: the Knight's red cape, shield and emblem, and the Rogue's green tunic and cape. Skin, hair, leather and metal are untouched. It writes four 512 px PNGs to `apps/web/public/assets/units/`.
+2. `node tools/build-units.mjs`: packs the two characters into `apps/web/public/assets/units.glb` (725 KB):
+   - only the parts used: Knight body, helmet, 1H sword, round shield and cape; Rogue body, 1H crossbow and cape
+   - only the clips used (7 each, plus 1H_Ranged_Aiming for the Rogue), resampled
+   - a simplified `__lod` copy of every part (about 40% of the triangles), made with meshoptimizer
+   - textures stripped, because the game loads the recoloured PNGs
+   - `PLAIN=1 KIT_OUT=…/units.json` gives a self-contained JSON version for the hosted preview
+3. At load, `apps/web/src/units/unitKit.ts` bakes every frame of those clips into a bone-matrix texture for instanced rendering. `apps/web/test/bake.test.ts` checks the result against three.js's own skinning.
+
 ## Animation: what the assets really have
 
 - **Buildings have no animation clips.** Windmill fans, watermill wheels and catapult turrets are separate nodes in the models. The game turns them in code, which is procedural motion rather than an authored animation.
 - **Trees sway** through a small vertex shader. This is also procedural.
-- **The character models (milestone 2) ship 76 real clips each**, checked in the files. They include Idle, Walking_A/B/C, Running_A/B, 1H/2H melee attacks, 1H/2H ranged aim, reload and shoot, Block, Hit_A/B, Death_A/B, Cheer and Spellcast. There are no horse models or riding clips, so cavalry needs another source (see below).
+- **The character models ship 76 real clips each**, checked in the files.
+  - The game uses Idle, Walking_A and Running_A now.
+  - It has also baked 1H_Melee_Attack_Chop (infantry), 1H_Ranged_Shoot (archers), Hit_A, Death_A and Cheer, ready for combat in milestone 3.
+  - There are no horse models or riding clips, so cavalry needs another source (see below).
+- **Walk and run playback speed is scaled to each soldier's real speed.** Nothing else about the clips is changed.
+- **The archer model carries a crossbow;** the pack has no bow. The ranged clips are crossbow animations.
 
 ## Gaps and stand-ins
 

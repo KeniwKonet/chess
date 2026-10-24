@@ -107,3 +107,19 @@ export function nearestPlace(q: number, r: number): string {
   }
   return bd === 0 ? best.name : `near ${best.name}`;
 }
+
+/** Nearest named place to a world point, phrased for the field log ("to the Ford of Ash" / "near Vey Watchtower"). */
+export function nearestPlaceXZ(x: number, z: number, heading: boolean): string {
+  const h = fromWorld(x, z);
+  let best = realm.places[0]!;
+  let bd = Infinity;
+  for (const p of realm.places) {
+    const d = (Math.abs(p.q - h.q) + Math.abs(p.r - h.r) + Math.abs(p.q + p.r - h.q - h.r)) / 2;
+    if (d < bd) {
+      bd = d;
+      best = p;
+    }
+  }
+  if (bd <= 1) return `${heading ? 'to' : 'at'} ${best.name}`;
+  return `${heading ? 'toward' : 'near'} ${best.name}`;
+}

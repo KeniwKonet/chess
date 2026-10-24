@@ -1,15 +1,16 @@
 /**
  * Mouse, keyboard and touch camera control plus hover/selection picking.
  *
- * Milestone 1 bindings (see Help panel):
- *   drag (left or right)  pan, the ground stays under the pointer
- *   middle-drag / shift-drag  rotate
+ * Bindings (see Help panel):
+ *   left-click            select a unit, building or tile;  shift-click adds/removes units
+ *   left-drag             box-select your units (shift adds);  double-click a soldier: all of that type in view
+ *   right-click           order selected units to that point;  right-drag  pan (ground stays under the pointer)
+ *   middle-drag / Alt-drag  rotate;  touch: one finger pans, a tap selects, or orders selected units
  *   wheel / pinch         zoom toward the pointer
  *   two-finger twist      rotate
  *   WASD / arrows         pan;  Q / E rotate;  + / - zoom
  *   H                     return to Sunspire;  O overview;  F focus selection;  N face north
- *   click                 select building or tile;  double-click  focus;  Esc  clear
- * Left-drag will become box-select once units exist (milestone 2); right-drag keeps panning.
+ *   X stop;  Ctrl+A select all;  Ctrl+1-9 set group, 1-9 recall (twice to jump);  Esc clear
  */
 import { useEffect, useRef } from 'react';
 import { useFrame, useThree } from '@react-three/fiber';
@@ -19,6 +20,8 @@ import { cam, flyTo, HOME_POSE, OVERVIEW_POSE } from './camera';
 import { clampPose, eye, panScreen, rayGround, step, zoomAt, type CamPose } from './rts';
 import { pick, realm, buildingById, cellByKey, nearestPlace, TERRAIN_LABEL } from '../game';
 import { useUi } from '../state/ui';
+import { game, orderMove, orderStop, ownUnits, pickUnit, renderPos, PLAYER, describeUnits, ownSelected } from '../sim/runner';
+import { box } from '../hud/BoxSelect';
 
 const CLICK_PX = 6;
 
@@ -44,7 +47,16 @@ function heldKey(k: string, secs: number, g: CamPose): CamPose {
 const HELD = new Set(['a', 'd', 'w', 's', 'arrowleft', 'arrowright', 'arrowup', 'arrowdown', 'q', 'e', '+', '=', '-', '_']);
 
 export function focusPick(): boolean {
-  const s = useUi.getState().selected;
+  const ui = useUi.getState();
+  if (ui.selectedUnits.length) {
+    const us = ui.selectedUnits.map((id) => game.sim.unit(id)).filter((u) => !!u);
+    if (us.length) {
+      const c = us.reduce((a, u) => ({ x: a.x + u!.x / us.length, z: a.z + u!.z / us.length }), { x: 0, z: 0 });
+      flyTo({ x: c.x, z: c.z, dist: Math.min(cam.goal.dist, 22) });
+      return true;
+    }
+  }
+  const s = ui.selected;
   if (!s) return false;
   const h = s.kind === 'building' ? buildingById.get(s.id) : cellByKey.get(s.key);
   if (!h) return false;
@@ -68,7 +80,10 @@ export function CameraRig() {
   const { camera, gl, size } = useThree();
   const pointers = useRef(new Map<number, { x: number; y: number; button: number; shift: boolean }>());
   const drag = useRef<{
-    mode: 'pan' | 'rotate' | 'touch' | null;
+    mode: 'pan' | 'rotate' | 'touch' | 'box' | null;
+    button?: number;
+    touch?: boolean;
+    shift?: boolean;
     startX: number;
     startY: number;
     moved: boolean;
@@ -81,6 +96,7 @@ export function CameraRig() {
   const hoverAt = useRef<{ x: number; y: number } | null>(null);
   const intro = useRef(true);
   const lastClick = useRef(0);
+  const lastGroup = useRef({ n: 0, t: 0 });
   const ray = useRef(new THREE.Raycaster());
   const ndc = useRef(new THREE.Vector2());
   const sharp = useRef(2.2);
@@ -90,6 +106,15 @@ export function CameraRig() {
     const id = setTimeout(() => flyTo(HOME_POSE), 700);
     return () => clearTimeout(id);
   }, []);
+
+  useEffect(() => {
+    // Test hook: world point to page pixels.
+    (window as unknown as { __crProject: (x: number, y: number, z: number) => { x: number; y: number } }).__crProject = (x, y, z) => {
+      const v = new THREE.Vector3(x, y, z).project(camera);
+      const r = gl.domElement.getBoundingClientRect();
+      return { x: r.left + ((v.x + 1) / 2) * r.width, y: r.top + ((1 - v.y) / 2) * r.height };
+    };
+  }, [camera, gl]);
 
   useEffect(() => {
     const el = gl.domElement;
@@ -123,14 +148,20 @@ export function CameraRig() {
         const [a, b] = [...pointers.current.values()];
         d.mode = 'touch';
         d.moved = true;
+        box.active = false;
         d.pinch = { d: Math.hypot(a!.x - b!.x, a!.y - b!.y), a: Math.atan2(b!.y - a!.y, b!.x - a!.x), mid: { x: (a!.x + b!.x) / 2, y: (a!.y + b!.y) / 2 } };
         d.startPose = { ...cam.goal };
         return;
       }
-      d.mode = e.button === 1 || e.shiftKey ? 'rotate' : 'pan';
+      d.touch = e.pointerType === 'touch';
+      d.button = e.button;
+      // Mouse: left = select (click or box), right = order (click) or pan (drag),
+      // middle or Alt+left = rotate. Touch: one finger pans; a tap selects or orders.
+      d.mode = e.button === 1 || (e.button === 0 && e.altKey) ? 'rotate' : e.button === 0 && !d.touch ? 'box' : 'pan';
       d.startX = e.clientX;
       d.startY = e.clientY;
       d.moved = false;
+      d.shift = e.shiftKey;
       d.t0 = performance.now();
       d.grab = groundAt(e.clientX, e.clientY) ?? undefined;
       d.startPose = { ...cam.goal };
@@ -158,6 +189,15 @@ export function CameraRig() {
       if (!d.mode || d.mode === 'touch') return;
       if (!d.moved && Math.hypot(e.clientX - d.startX, e.clientY - d.startY) > CLICK_PX) d.moved = true;
       if (!d.moved || !d.startPose) return;
+      if (d.mode === 'box') {
+        const r = el.getBoundingClientRect();
+        box.active = true;
+        box.x0 = d.startX - r.left;
+        box.y0 = d.startY - r.top;
+        box.x1 = e.clientX - r.left;
+        box.y1 = e.clientY - r.top;
+        return;
+      }
       if (d.mode === 'rotate') {
         cam.goal = { ...d.startPose, yaw: d.startPose.yaw - ((e.clientX - d.startX) / size.width) * Math.PI * 1.6 };
         return;
@@ -174,10 +214,90 @@ export function CameraRig() {
       }
     };
 
+    /** Screen position of a unit (its chest), in canvas pixels. */
+    const v3 = new THREE.Vector3();
+    const screenOf = (x: number, z: number) => {
+      v3.set(x, 0.35, z).project(camera);
+      return { x: ((v3.x + 1) / 2) * size.width, y: ((1 - v3.y) / 2) * size.height, front: v3.z < 1 };
+    };
+
+    const finishBox = (shift: boolean) => {
+      const ui = useUi.getState();
+      const x0 = Math.min(box.x0, box.x1), x1 = Math.max(box.x0, box.x1);
+      const y0 = Math.min(box.y0, box.y1), y1 = Math.max(box.y0, box.y1);
+      box.active = false;
+      const inside = ownUnits()
+        .filter((u) => {
+          const p = renderPos(u);
+          const s = screenOf(p.x, p.z);
+          return s.front && s.x >= x0 && s.x <= x1 && s.y >= y0 && s.y <= y1;
+        })
+        .map((u) => u.id);
+      const ids = shift ? [...new Set([...ui.selectedUnits.filter((id) => game.sim.unit(id)?.side === PLAYER), ...inside])] : inside;
+      if (!ids.length && !shift) {
+        ui.selectUnits([]);
+        return;
+      }
+      ui.selectUnits(ids);
+      if (inside.length) ui.addLog(`Selected ${describeUnits(ids)}`, 'sun');
+    };
+
+    /** Left click / tap: select a unit, or (touch, with your units selected) order them, or inspect. */
+    const click = (cx: number, cy: number, shift: boolean, touch: boolean) => {
+      const ui = useUi.getState();
+      const r = rayFrom(cx, cy);
+      const unitId = pickUnit(r.origin, r.direction);
+      const now = performance.now();
+      const double = now - lastClick.current < 320;
+      lastClick.current = now;
+      if (unitId !== null) {
+        const u = game.sim.unit(unitId)!;
+        if (double && u.side === PLAYER) {
+          // Double-click: everyone of that type in view.
+          const ids = ownUnits(u.type)
+            .filter((o) => {
+              const p = renderPos(o);
+              const s = screenOf(p.x, p.z);
+              return s.front && s.x >= 0 && s.x <= size.width && s.y >= 0 && s.y <= size.height;
+            })
+            .map((o) => o.id);
+          ui.selectUnits(ids);
+          ui.addLog(`Selected ${describeUnits(ids)} in view`, 'sun');
+          return;
+        }
+        if (shift && u.side === PLAYER) {
+          const cur = ui.selectedUnits.filter((id) => game.sim.unit(id)?.side === PLAYER);
+          ui.selectUnits(cur.includes(unitId) ? cur.filter((id) => id !== unitId) : [...cur, unitId]);
+          return;
+        }
+        ui.selectUnits([unitId]);
+        ui.addLog(`Selected ${u.name}${u.side === PLAYER ? '' : ' (enemy)'}`, u.side === PLAYER ? 'sun' : 'moon');
+        return;
+      }
+      const p = pick(r.origin, r.direction);
+      if (touch && ownSelected().length && p?.kind !== 'building') {
+        const g = groundAt(cx, cy);
+        if (g && orderMove(g.x, g.z)) return;
+      }
+      if (double && p && ui.selected && JSON.stringify(p) === JSON.stringify(ui.selected)) {
+        focusPick();
+        ui.addLog(`Camera focused on ${describePick(p)}`, 'system');
+        return;
+      }
+      if (!p && ui.selectedUnits.length) {
+        ui.selectUnits([]);
+        return;
+      }
+      ui.select(p);
+      if (p) ui.addLog(`Selected ${describePick(p)}`, p.kind === 'building' ? (buildingById.get(p.id)?.side === 'moon' ? 'moon' : 'sun') : 'info');
+    };
+
     const onUp = (e: PointerEvent) => {
       const d = drag.current;
-      const wasClick = pointers.current.size === 1 && !d.moved && e.button === 0 && performance.now() - d.t0 < 600;
+      const single = pointers.current.size === 1;
+      const quick = performance.now() - d.t0 < 600;
       pointers.current.delete(e.pointerId);
+      const mode = d.mode;
       if (pointers.current.size === 0) d.mode = null;
       else if (pointers.current.size === 1) {
         // Continue as a one-finger pan from here.
@@ -188,20 +308,21 @@ export function CameraRig() {
         d.moved = true;
         d.grab = groundAt(rest!.x, rest!.y) ?? undefined;
         d.startPose = { ...cam.goal };
+        return;
       }
-      if (!wasClick) return;
-      const r = rayFrom(e.clientX, e.clientY);
-      const p = pick(r.origin, r.direction);
-      const ui = useUi.getState();
-      const now = performance.now();
-      if (now - lastClick.current < 320 && p && ui.selected && JSON.stringify(p) === JSON.stringify(ui.selected)) {
-        focusPick();
-        ui.addLog(`Camera focused on ${describePick(p)}`, 'system');
-      } else {
-        ui.select(p);
-        if (p) ui.addLog(`Selected ${describePick(p)}`, p.kind === 'building' ? (buildingById.get(p.id)?.side === 'moon' ? 'moon' : 'sun') : 'info');
+      if (!single) return;
+      if (mode === 'box' && d.moved && box.active) return finishBox(!!d.shift);
+      box.active = false;
+      if (d.moved || !quick) return;
+      if (d.button === 2) {
+        // Right-click: move order for your selected units.
+        const g = groundAt(e.clientX, e.clientY);
+        if (g && !orderMove(g.x, g.z) && useUi.getState().selectedUnits.length) {
+          useUi.getState().addLog('Those are Moon soldiers: you can inspect them but not command them', 'system');
+        }
+        return;
       }
-      lastClick.current = now;
+      if (d.button === 0 || d.touch) click(e.clientX, e.clientY, !!d.shift, !!d.touch);
     };
 
     const onWheel = (e: WheelEvent) => {
@@ -214,6 +335,7 @@ export function CameraRig() {
     const onLeave = () => {
       hoverAt.current = null;
       useUi.getState().hover(null);
+      useUi.getState().hoverUnit(null);
     };
     const onContext = (e: Event) => e.preventDefault();
 
@@ -229,8 +351,38 @@ export function CameraRig() {
       if (k === 'h') { userInput(); flyTo(HOME_POSE); ui.addLog('Camera returned to Sunspire', 'system'); }
       if (k === 'o') { userInput(); flyTo(OVERVIEW_POSE); ui.addLog('Strategic overview', 'system'); }
       if (k === 'n') { userInput(); flyTo({ yaw: Math.round(cam.goal.yaw / (Math.PI * 2)) * Math.PI * 2 }); }
-      if (k === 'f') { userInput(); if (focusPick()) ui.addLog(`Camera focused on ${describePick(ui.selected)}`, 'system'); }
-      if (k === 'escape') { ui.select(null); if (ui.showHelp) ui.toggle('showHelp'); }
+      if (k === 'f') { userInput(); if (focusPick()) ui.addLog(ui.selectedUnits.length ? 'Camera focused on the selection' : `Camera focused on ${describePick(ui.selected)}`, 'system'); }
+      if (k === 'escape') { ui.select(null); ui.selectUnits([]); if (ui.showHelp) ui.toggle('showHelp'); }
+      if (k === 'x') { if (orderStop()) e.preventDefault(); }
+      if (k === 'a' && (e.ctrlKey || e.metaKey)) {
+        e.preventDefault();
+        const ids = ownUnits().map((u) => u.id);
+        ui.selectUnits(ids);
+        ui.addLog(`Selected all: ${describeUnits(ids)}`, 'sun');
+      }
+      if (/^[1-9]$/.test(k)) {
+        const n = Number(k);
+        if (e.ctrlKey || e.metaKey) {
+          e.preventDefault();
+          const ids = ownSelected();
+          if (ids.length) {
+            game.groups.set(n, ids);
+            ui.addLog(`Group ${n} set: ${describeUnits(ids)}`, 'sun');
+          }
+        } else {
+          const ids = (game.groups.get(n) ?? []).filter((id) => (game.sim.unit(id)?.hp ?? 0) > 0);
+          if (ids.length) {
+            const again = lastGroup.current.n === n && performance.now() - lastGroup.current.t < 400;
+            ui.selectUnits(ids);
+            if (again) {
+              const c = ids.map((id) => game.sim.unit(id)!).reduce((a, u) => ({ x: a.x + u.x / ids.length, z: a.z + u.z / ids.length }), { x: 0, z: 0 });
+              userInput();
+              flyTo({ x: c.x, z: c.z });
+            }
+            lastGroup.current = { n, t: performance.now() };
+          }
+        }
+      }
       if (k === '?' || (k === '/' && e.shiftKey)) ui.toggle('showHelp');
       if (k === '`') ui.toggle('showPerf');
       if (k === 'l') ui.toggle('showLabels');
@@ -341,9 +493,12 @@ export function CameraRig() {
       const r = gl.domElement.getBoundingClientRect();
       ndc.current.set(((hoverAt.current.x - r.left) / r.width) * 2 - 1, -((hoverAt.current.y - r.top) / r.height) * 2 + 1);
       ray.current.setFromCamera(ndc.current, camera);
-      const p = pick(ray.current.ray.origin, ray.current.ray.direction);
+      const uid = pickUnit(ray.current.ray.origin, ray.current.ray.direction);
+      ui.hoverUnit(uid);
+      const p = uid === null ? pick(ray.current.ray.origin, ray.current.ray.direction) : null;
       ui.hover(p);
-      gl.domElement.style.cursor = p?.kind === 'building' ? 'pointer' : drag.current.mode ? 'grabbing' : 'default';
+      gl.domElement.style.cursor =
+        uid !== null || p?.kind === 'building' ? 'pointer' : drag.current.mode === 'pan' ? 'grabbing' : ownSelected().length ? 'crosshair' : 'default';
     }
   });
 

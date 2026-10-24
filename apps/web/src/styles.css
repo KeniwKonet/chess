@@ -241,3 +241,31 @@ button { font: inherit; color: inherit; }
   .selection { bottom: calc(var(--gutter) + 118px); }
   .perf { top: 108px; }
 }
+
+/* ---------- units ---------- */
+.box-select {
+  position: absolute; pointer-events: none; border: 1.5px solid #ffe7a3; background: rgba(232, 179, 58, 0.12);
+  border-radius: 3px; box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.35);
+}
+.army { position: absolute; top: 76px; left: var(--gutter); display: flex; align-items: center; gap: 6px; padding: 6px 8px; }
+.army-label { font-family: var(--font-cond); font-weight: 700; font-size: 12px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--bronze-300); padding: 0 4px; }
+.army .btn span { color: var(--sun); margin-right: 2px; }
+.army .btn.on span { color: #fff6df; }
+.roster { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 12px; }
+.roster-chip {
+  position: relative; width: 34px; height: 38px; border-radius: 6px; border: 1px solid rgba(195, 154, 91, 0.45);
+  background: linear-gradient(180deg, #3a2c1c, #241a10); cursor: pointer; padding: 0; overflow: hidden;
+}
+.roster-chip:hover { border-color: var(--bronze-300); }
+.roster-chip:focus-visible { outline: 2px solid var(--sun); outline-offset: 1px; }
+.roster-glyph { font-size: 20px; line-height: 32px; color: var(--sun); }
+.side-moon .roster-glyph { color: var(--moon); }
+.roster-chip.moving::after { content: ''; position: absolute; top: 4px; right: 4px; width: 6px; height: 6px; border-radius: 50%; background: var(--good); }
+.roster-hp { position: absolute; left: 0; bottom: 0; height: 3px; background: var(--good); }
+.perf { top: 128px; }
+@media (max-width: 760px) {
+  .army { top: 108px; left: var(--gutter); padding: 4px 6px; gap: 4px; }
+  .army-label { display: none; }
+  .army .btn { padding: 5px 8px; }
+  .perf { top: 108px; }
+}
