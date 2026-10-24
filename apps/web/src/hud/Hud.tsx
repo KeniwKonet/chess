@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { STARTING_RESOURCES, moveCost } from '@cr/game-core';
-import { useUi, type Quality } from '../state/ui';
+import { useUi } from '../state/ui';
 import { buildingById, cellByKey, nearestPlace, realm, TERRAIN_LABEL, TYPE_LABEL } from '../game';
 import { cam, flyTo, HOME_POSE, OVERVIEW_POSE } from '../camera/camera';
 import { zoomAt, clampPose } from '../camera/rts';
@@ -8,11 +8,16 @@ import { focusPick } from '../camera/CameraRig';
 import { Minimap } from './Minimap';
 import { perf } from './perf';
 import { UnitPanel, ArmyBar } from './UnitPanel';
+import { WarTable } from './WarTable';
+import { setPaused } from './Menus';
+import { game, PLAYER } from '../sim/runner';
 
 const fmt = (n: number) => n.toLocaleString('en-GB');
 const clock = (t: number) => `${String(Math.floor(t / 60)).padStart(2, '0')}:${String(Math.floor(t % 60)).padStart(2, '0')}`;
 
 export function Hud() {
+  const screen = useUi((s) => s.screen);
+  if (screen === 'title') return <Help />;
   return (
     <div className="hud">
       <TopLeft />
@@ -26,6 +31,7 @@ export function Hud() {
       <SelectionPanel />
       <UnitPanel />
       <FieldLog />
+      <WarTable />
       <Help />
       <PerfPanel />
     </div>
@@ -40,8 +46,8 @@ function TopLeft() {
         <div className="brand-name">Chess Realms</div>
         <div className="brand-sub">The Ashen Divide · Sun vs Moon</div>
       </div>
-      <span className="chip chip-proto" title="Milestone 2: battlefield, units, selection, orders and pathfinding. Combat, economy and the War Table come in later milestones.">
-        Milestone 2 build
+      <span className="chip chip-proto" title="Prototype: battlefield, armies, combat, Moon AI, War Table and match flow. Economy and extra unit types are not in this build.">
+        Prototype
       </span>
     </div>
   );
@@ -55,7 +61,7 @@ function Resources() {
     ['iron', 'Iron', '#B9C3CF'],
   ];
   return (
-    <div className="resources panel" title="Sunspire's starting stockpile. The economy is not simulated until milestone 3, so these numbers do not change.">
+    <div className="resources panel" title="Sunspire's stockpile. Gathering and spending are not simulated in this build, so these numbers do not change; reinforcements come from barracks instead.">
       {items.map(([k, label, colour]) => (
         <div key={k} className="res">
           <span className="res-dot" style={{ background: colour }} />
@@ -63,31 +69,23 @@ function Resources() {
           <span className="res-val">{fmt(STARTING_RESOURCES[k])}</span>
         </div>
       ))}
-      <span className="res-note">Starting stock · not yet simulated</span>
+      <span className="res-note">Stockpile · economy not simulated</span>
     </div>
   );
 }
 
 function Toolbar() {
-  const { quality, setQuality, showLabels, toggle, showPerf, addLog } = useUi();
-  const qs: Quality[] = ['low', 'medium', 'high'];
+  const { showLabels, toggle, showPerf, addLog } = useUi();
   return (
     <div className="toolbar panel" role="toolbar" aria-label="View controls">
       <button className="btn" onClick={() => { flyTo(OVERVIEW_POSE); addLog('Strategic overview', 'system'); }} title="Strategic overview (O)">Overview</button>
       <button className="btn" onClick={() => { flyTo(HOME_POSE); addLog('Camera returned to Sunspire', 'system'); }} title="Return to Sunspire (H)">Sunspire</button>
       <button className={`btn${showLabels ? ' on' : ''}`} aria-pressed={showLabels} onClick={() => toggle('showLabels')} title="Map labels (L)">Labels</button>
-      <div className="seg" role="group" aria-label="Graphics quality">
-        {qs.map((q) => (
-          <button key={q} className={`btn${quality === q ? ' on' : ''}`} aria-pressed={quality === q} onClick={() => { setQuality(q); addLog(`Graphics quality: ${q}`, 'system'); }}>
-            {q[0]!.toUpperCase() + q.slice(1)}
-          </button>
-        ))}
-      </div>
+      <WarTableButton />
       <button className={`btn${showPerf ? ' on' : ''}`} aria-pressed={showPerf} onClick={() => toggle('showPerf')} title="Performance stats (`)">Stats</button>
-      <button className="btn" onClick={() => toggle('showHelp')} title="Controls (?)">?</button>
-      <button className="btn btn-locked" disabled title="The War Table (chessboard) connects to this battlefield in milestone 5">
-        War Table <small>M5</small>
-      </button>
+      <button className="btn" onClick={() => toggle('showHelp')} title="Controls (?)" aria-label="How to play">?</button>
+      <button className="btn" onClick={() => toggle('showSettings')} title="Settings" aria-label="Settings">⚙</button>
+      <button className="btn" onClick={() => setPaused(true)} title="Pause (P)" aria-label="Pause">❚❚</button>
     </div>
   );
 }
@@ -109,13 +107,17 @@ function SelectionPanel() {
   const selected = useUi((s) => s.selected);
   const select = useUi((s) => s.select);
   const addLog = useUi((s) => s.addLog);
+  useUi((s) => s.unitRev); // live structure and ownership
   if (!selected) return null;
 
   if (selected.kind === 'building') {
-    const b = buildingById.get(selected.id)!;
+    const def = buildingById.get(selected.id)!;
+    const live = game.sim.building(def.id)!;
+    const b = { ...def, hp: Math.ceil(live.hp), side: live.side };
     const pct = b.maxHp ? Math.round((b.hp / b.maxHp) * 100) : 0;
-    const cap = b.capture ? realm.captures.find((c) => c.id === b.capture) : undefined;
-    const own = b.side === 'sun';
+    const cap = b.capture ? game.sim.captures.find((c) => c.id === b.capture) : undefined;
+    const own = b.side === PLAYER;
+    const destroyed = live.destroyed;
     return (
       <section className={`selection panel side-${b.side}`} aria-label="Selection">
         <header>
@@ -126,8 +128,8 @@ function SelectionPanel() {
           </div>
           <button className="btn icon" onClick={() => select(null)} aria-label="Close">×</button>
         </header>
-        {b.type === 'rubble' ? (
-          <p className="sel-text">Destroyed before this battle began. Engineers will be able to rebuild here once construction is in (milestone 3).</p>
+        {b.type === 'rubble' || destroyed ? (
+          <p className="sel-text">{b.type === 'rubble' ? 'Destroyed before this battle began.' : 'Destroyed in this battle.'} Rebuilding needs engineers and the economy, which are not in this build.</p>
         ) : (
           <div className="hp">
             <div className="hp-row"><span>Structure</span><span>{fmt(b.hp)} / {fmt(b.maxHp)}</span></div>
@@ -140,17 +142,17 @@ function SelectionPanel() {
             )}
           </div>
         )}
-        {cap && <p className="sel-text">Capture point. {cap.owner === 'sun' ? 'You hold it.' : cap.owner === 'moon' ? 'Moon holds it.' : 'No one holds it.'} {cap.id === 'vey' ? 'Holding Vey unlocks Scout Sight on the War Table.' : ''}</p>}
+        {cap && <p className="sel-text">Capture point. {cap.owner === 'sun' ? 'You hold it.' : cap.owner === 'moon' ? 'Moon holds it.' : 'No one holds it.'} Stand soldiers in the ring with no enemy inside to take it. {cap.id === 'vey' ? 'Holding Vey gives Scout Sight: your soldiers see further.' : ''}</p>}
+        {live.weapon && !destroyed && <p className="sel-text">Shoots enemies within {live.weapon.range} units for {live.weapon.damage} damage.</p>}
         <div className="sel-actions">
           <button className="btn" onClick={() => { focusPick(); addLog(`Camera focused on ${b.name}`, 'system'); }}>Focus (F)</button>
-          {own && b.type !== 'rubble' && (
-            <>
-              <button className="btn btn-locked" disabled title="Training arrives with units in milestone 2–3">Train <small>M3</small></button>
-              <button className="btn btn-locked" disabled title="Upgrades and repairs need the economy (milestone 3)">Upgrade <small>M3</small></button>
-            </>
+          {own && b.type !== 'rubble' && !destroyed && (
+            <button className="btn btn-locked" disabled title="Training, upgrades and repairs need the economy, which is not in this build. Barracks and ranges send reinforcements every 90 seconds while they stand.">
+              Train <small>Economy</small>
+            </button>
           )}
         </div>
-        <p className="sel-foot">Values are this scenario's starting state. Combat and the economy do not run yet.</p>
+        <p className="sel-foot">{b.type === 'barracks' || b.type === 'archery' ? 'While it stands it sends reinforcements every 90 seconds.' : b.type === 'castle' ? 'If this castle falls, the battle is lost.' : 'Resources are not simulated in this build.'}</p>
       </section>
     );
   }
@@ -190,7 +192,7 @@ function FieldLog() {
       </button>
       {open && (
         <>
-          <p className="log-note">Your actions this session. Battle reports start when combat runs (milestone 3).</p>
+          <p className="log-note">Orders, fighting, captures, reinforcements and War Table moves, as they happen.</p>
           <ol>
             {log.length === 0 && <li className="log-empty">Click a building or tile to inspect it.</li>}
             {log.map((e) => (
@@ -215,9 +217,12 @@ function Help() {
     ['Click a soldier', 'Select it. Shift-click adds or removes'],
     ['Left-drag', 'Box-select your soldiers (Shift adds)'],
     ['Double-click a soldier', 'Select all of that type in view'],
-    ['Right-click', 'Send selected soldiers there'],
-    ['Tap (touch)', 'Select, or send selected soldiers there'],
+    ['Right-click', 'Move there, or attack the enemy under the pointer'],
+    ['T, then click', 'Attack-move: advance and fight anything met on the way'],
+    ['Tap (touch)', 'Select; with soldiers selected, move there or attack the enemy tapped'],
     ['X', 'Stop and hold position'],
+    ['B', 'Open the War Table (chess that commands the battle)'],
+    ['P · Esc', 'Pause'],
     ['Ctrl+A · Ctrl+1–9 · 1–9', 'Select all · set group · recall group (twice to jump)'],
     ['Right-drag · one finger', 'Pan. The ground stays under your pointer'],
     ['Wheel · pinch', 'Zoom toward the pointer'],
@@ -247,7 +252,9 @@ function Help() {
             Edge panning {edgeScroll ? 'on' : 'off'}
           </button>
         </div>
-        <p className="sel-foot">Zoomed far out, soldiers show as chess pieces: pawns are infantry, bishops are archers.</p>
+        <p className="sel-foot">
+          Win by destroying Nocturne Castle or by checkmate on the War Table; lose if Sunspire falls. Idle soldiers defend themselves; capture rings change hands when only one side stands in them; barracks and ranges send reinforcements every 90 seconds while they stand. Zoomed far out, soldiers show as chess pieces: pawns are infantry, bishops are archers.
+        </p>
       </section>
     </div>
   );
@@ -276,5 +283,18 @@ function PerfPanel() {
     <div className="perf panel" aria-label="Performance">
       <pre ref={ref}>measuring…</pre>
     </div>
+  );
+}
+
+function WarTableButton() {
+  const show = useUi((s) => s.showWarTable);
+  const toggle = useUi((s) => s.toggle);
+  useUi((s) => s.unitRev);
+  const wt = game.match.warTable;
+  const yourMove = wt.turn === PLAYER && !wt.over;
+  return (
+    <button className={`btn${show ? ' on' : ''}${yourMove && !show ? ' nudge' : ''}`} aria-pressed={show} onClick={() => toggle('showWarTable')} title="The War Table: chess that commands the battle (B)">
+      ♛ War Table{yourMove && !show ? <small>Your move</small> : null}
+    </button>
   );
 }

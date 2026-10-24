@@ -14,6 +14,7 @@
 import * as THREE from 'three';
 import type { GLTF } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import type { UnitType } from '@cr/game-core';
+import { withFog } from '../world/fog';
 
 export const BAKE_FPS = 30;
 export const UNIT_HEIGHT = 0.78;
@@ -274,7 +275,7 @@ vec3 objectTangent = vec3(tangent.xyz);
       .replace('#include <begin_vertex>', 'vec3 transformed = (crM * vec4(position, 1.0)).xyz;');
   };
   mat.customProgramCacheKey = () => `baked-${model.type}`;
-  return mat;
+  return withFog(mat);
 }
 
 /** Row pair and blend for a clip at a time (seconds), looping or held on the last frame. */

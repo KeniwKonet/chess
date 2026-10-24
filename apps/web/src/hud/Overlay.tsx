@@ -10,6 +10,7 @@ import { realm, buildingById, buildingModel } from '../game';
 import { useUi } from '../state/ui';
 import { cam } from '../camera/camera';
 import { zoomT } from '../camera/rts';
+import { game } from '../sim/runner';
 
 interface Anchor {
   el: HTMLElement;
@@ -33,6 +34,7 @@ const ownerName = { sun: 'Sun', moon: 'Moon', neutral: 'Unclaimed' } as const;
 
 export function Overlay() {
   const showLabels = useUi((s) => s.showLabels);
+  useUi((s) => s.unitRev); // live hit points and ownership
   const selected = useUi((s) => s.selected);
   const hovered = useUi((s) => s.hovered);
   const focusIds = new Set<string>();
@@ -55,21 +57,27 @@ export function Overlay() {
           );
         })}
       {showLabels &&
-        realm.captures.map((c) => {
-          const w = toWorld(c);
+        game.sim.captures.map((c) => {
+          const pct = Math.round(Math.abs(c.progress));
+          const swinging = c.owner === 'neutral' ? pct > 0 : (c.owner === 'sun' ? c.progress < 100 : c.progress > -100);
+          const leaning = c.progress > 0 ? 'Sun' : 'Moon';
           return (
-            <div key={c.id} ref={anchorRef(`cap:${c.id}`, w.x, 3.2, w.z)} className={`tag tag-capture side-${c.owner}`}>
+            <div key={c.id} ref={anchorRef(`cap:${c.id}`, c.x, 3.2, c.z)} className={`tag tag-capture side-${c.owner}`}>
               <span className="tag-flag" />
               {c.name}
-              <small>{c.owner === 'neutral' ? 'Contested' : `Held by ${ownerName[c.owner]}`}</small>
+              <small>{c.owner === 'neutral' ? (pct ? `${leaning} ${pct}%` : 'Unclaimed') : `Held by ${ownerName[c.owner]}${swinging ? ` · ${pct}%` : ''}`}</small>
             </div>
           );
         })}
       {realm.buildings
+        .map((d) => {
+          const live = game.sim.building(d.id)!;
+          return { ...d, hp: live.hp, side: live.side, type: live.destroyed ? ('rubble' as const) : d.type, progress: live.destroyed ? undefined : d.progress };
+        })
         .filter((b) => b.hp < b.maxHp || focusIds.has(b.id))
         .map((b) => {
           const w = toWorld(b);
-          const h = buildingModel(b).height + 0.5;
+          const h = (b.type === 'rubble' ? 0.6 : buildingModel(b).height) + 0.5;
           const pct = b.maxHp ? Math.round((b.hp / b.maxHp) * 100) : 0;
           const focus = focusIds.has(b.id);
           return (

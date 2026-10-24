@@ -51,7 +51,7 @@ This version uses standard mesh quantisation instead of meshopt, so no WebAssemb
 - **Trees sway** through a small vertex shader. This is also procedural.
 - **The character models ship 76 real clips each**, checked in the files.
   - The game uses Idle, Walking_A and Running_A now.
-  - It has also baked 1H_Melee_Attack_Chop (infantry), 1H_Ranged_Shoot (archers), Hit_A, Death_A and Cheer, ready for combat in milestone 3.
+  - It has also baked 1H_Melee_Attack_Chop (infantry), 1H_Ranged_Shoot (archers), Hit_A, Death_A and Cheer, used by combat since milestone 3 (attack, hit and death are driven by the simulation; Cheer plays for the winners).
   - There are no horse models or riding clips, so cavalry needs another source (see below).
 - **Walk and run playback speed is scaled to each soldier's real speed.** Nothing else about the clips is changed.
 - **The archer model carries a crossbow;** the pack has no bow. The ranged clips are crossbow animations.
@@ -62,6 +62,6 @@ This version uses standard mesh quantisation instead of meshopt, so no WebAssemb
 | --- | --- |
 | Stables | No stables model in the CC0 pack. The tavern model stands in, and the selection panel still says "Stables". Replace when a stables model is sourced. |
 | Siege workshop | Uses the catapult tower, which reads well as a siege workshop. |
-| Horses and cavalry | Not in either pack. Options: Quaternius animal packs (CC0), or KayKit paid extras. Needed by milestone 3. |
-| Siege engines as units | Only `projectile_catapult` and the catapult tower exist. A wheeled trebuchet or ram must be sourced (milestone 3). |
-| Walls | `wall_*` pieces are packed but not yet placed. Castle walls arrive with construction (milestone 3). |
+| Horses and cavalry | Not in either pack. Options: Quaternius animal packs (CC0), or KayKit paid extras. Still needed: knights on the War Table command no one until cavalry exists. |
+| Siege engines as units | Only `projectile_catapult` and the catapult tower exist. A wheeled trebuchet or ram must be sourced; not yet in the game. |
+| Walls | `wall_*` pieces are packed but not yet placed. Castle walls arrive with construction, which is not built yet (the economy is not simulated). |

@@ -15,7 +15,25 @@ export interface LogEntry {
   tone: 'info' | 'sun' | 'moon' | 'system';
 }
 
+export type Screen = 'title' | 'playing' | 'summary';
+
 interface UiState {
+  /** The 3D world has finished loading. */
+  loaded: boolean;
+  screen: Screen;
+  paused: boolean;
+  difficulty: 'recruit' | 'captain' | 'warlord';
+  result: { winner: 'sun' | 'moon'; reason: string; at: number } | null;
+  /** Next ground click issues an attack-move (A key or the Attack button). */
+  attackMode: boolean;
+  showWarTable: boolean;
+  showSettings: boolean;
+  setScreen: (s: Screen) => void;
+  setPaused: (p: boolean) => void;
+  setDifficulty: (d: UiState['difficulty']) => void;
+  endMatch: (winner: 'sun' | 'moon', reason: string) => void;
+  setAttackMode: (v: boolean) => void;
+  clearLog: () => void;
   selected: Pick;
   hovered: Pick;
   /** Selected soldiers by id (player's or, for inspection only, the enemy's). */
@@ -36,7 +54,7 @@ interface UiState {
   bumpUnits: () => void;
   hover: (p: Pick) => void;
   setQuality: (q: Quality) => void;
-  toggle: (k: 'showPerf' | 'showHelp' | 'showLabels' | 'edgeScroll') => void;
+  toggle: (k: 'showPerf' | 'showHelp' | 'showLabels' | 'edgeScroll' | 'showWarTable' | 'showSettings') => void;
   setAssetsFailed: (v: boolean) => void;
   addLog: (text: string, tone?: LogEntry['tone']) => void;
 }
@@ -49,6 +67,20 @@ const same = (a: Pick, b: Pick) =>
   a === b || (!!a && !!b && a.kind === b.kind && (a.kind === 'building' ? a.id === (b as typeof a).id : a.key === (b as { key: string }).key));
 
 export const useUi = create<UiState>((set) => ({
+  loaded: false,
+  screen: 'title',
+  paused: false,
+  difficulty: 'captain',
+  result: null,
+  attackMode: false,
+  showWarTable: false,
+  showSettings: false,
+  setScreen: (screen) => set({ screen }),
+  setPaused: (paused) => set({ paused }),
+  setDifficulty: (difficulty) => set({ difficulty }),
+  endMatch: (winner, reason) => set({ result: { winner, reason, at: performance.now() } }),
+  setAttackMode: (attackMode) => set({ attackMode }),
+  clearLog: () => set({ log: [] }),
   selected: null,
   hovered: null,
   quality: isMobile ? 'medium' : 'high',

@@ -7,6 +7,7 @@
   "dependencies": {
     "@cr/game-core": "workspace:*",
     "@cr/chess-core": "workspace:*",
+    "@cr/match": "workspace:*",
     "three": "0.186.1",
     "@react-three/fiber": "9.8.2",
     

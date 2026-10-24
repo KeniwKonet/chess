@@ -8,7 +8,8 @@ import { CIRCUMRADIUS, toWorld } from '@cr/game-core';
 import { realm, buildingModel } from '../game';
 import { cam, flyTo } from '../camera/camera';
 import { useUi } from '../state/ui';
-import { game, renderPos } from '../sim/runner';
+import { game, renderPos, visibleToPlayer, PLAYER } from '../sim/runner';
+import { FOG_LEVELS } from '../world/fog';
 
 const W = 232;
 const PAD = 6;
@@ -16,6 +17,7 @@ const b = realm.bounds;
 const scale = (W - PAD * 2) / (b.maxX - b.minX);
 const H = Math.round((b.maxZ - b.minZ) * scale + PAD * 2);
 const toMap = (x: number, z: number) => ({ x: PAD + (x - b.minX) * scale, y: PAD + (z - b.minZ) * scale });
+const hexR = CIRCUMRADIUS * scale * 1.02;
 const toWorldPt = (mx: number, my: number) => ({ x: (mx - PAD) / scale + b.minX, z: (my - PAD) / scale + b.minZ });
 
 const TERRAIN = { grass: '#8DBA45', forest: '#3F7F3A', hill: '#A2B85A', mountain: '#8E8A80', field: '#E3B54F', water: '#3E8FD0' };
@@ -45,17 +47,6 @@ function paintBase(): HTMLCanvasElement {
     g.fillStyle = cell.river && !cell.bridge && !cell.ford ? '#3E8FD0' : cell.road || cell.bridge || cell.ford ? '#D9B27C' : TERRAIN[cell.terrain];
     hex(p.x, p.y, r);
     g.fill();
-  }
-  for (const cp of realm.captures) {
-    const w = toWorld(cp);
-    const p = toMap(w.x, w.z);
-    g.strokeStyle = SIDE[cp.owner];
-    g.lineWidth = 1.5;
-    g.setLineDash([3, 2]);
-    g.beginPath();
-    g.arc(p.x, p.y, (cp.radius * 2 + 0.6) * scale, 0, Math.PI * 2);
-    g.stroke();
-    g.setLineDash([]);
   }
   for (const bd of realm.buildings) {
     const w = toWorld(bd);
@@ -89,13 +80,45 @@ export function Minimap() {
       g.setTransform(1, 0, 0, 1, 0, 0);
       g.drawImage(base, 0, 0);
       g.scale(dpr, dpr);
-      // Soldiers (no fog of war yet, so Moon units show too).
+      // Fog of war, cell by cell, while a match is on.
+      if (useUi.getState().screen !== 'title') {
+        const vis = game.sim.visible[PLAYER];
+        const exp = game.sim.explored[PLAYER];
+        realm.cells.forEach((c, i) => {
+          if (vis[i]) return;
+          const w = toWorld(c);
+          const m = toMap(w.x, w.z);
+          g.fillStyle = `rgba(10,8,6,${exp[i] ? 1 - FOG_LEVELS.explored / 255 : 1 - FOG_LEVELS.unknown / 255})`;
+          g.beginPath();
+          for (let k = 0; k < 6; k++) {
+            const a = Math.PI / 6 + (k * Math.PI) / 3;
+            g.lineTo(m.x + Math.cos(a) * hexR, m.y + Math.sin(a) * hexR);
+          }
+          g.fill();
+        });
+      }
+      // Fallen buildings and capture owners change during play.
+      for (const b of game.sim.buildings) {
+        if (!b.destroyed) continue;
+        const m = toMap(b.x, b.z);
+        g.fillStyle = '#4a3b2c';
+        g.fillRect(m.x - 2.5, m.y - 2.5, 5, 5);
+      }
+      for (const c of game.sim.captures) {
+        const m = toMap(c.x, c.z);
+        g.strokeStyle = SIDE[c.owner];
+        g.lineWidth = 1.5;
+        g.beginPath();
+        g.arc(m.x, m.y, c.radius * scale, 0, Math.PI * 2);
+        g.stroke();
+      }
+      // Soldiers: yours always, the enemy's only where you can see them.
       const sel = new Set(useUi.getState().selectedUnits);
       for (const u of game.sim.units) {
-        if (u.hp <= 0) continue;
+        if (u.hp <= 0 || !visibleToPlayer(u)) continue;
         const p = renderPos(u);
         const m = toMap(p.x, p.z);
-        g.fillStyle = sel.has(u.id) ? '#FFFFFF' : u.side === 'sun' ? '#FFD45E' : '#7FB2FF';
+        g.fillStyle = sel.has(u.id) ? '#FFFFFF' : u.side === 'sun' ? '#FFD45E' : '#FF6B5E';
         g.fillRect(m.x - 1.5, m.y - 1.5, 3, 3);
       }
       const fp = cam.footprint;

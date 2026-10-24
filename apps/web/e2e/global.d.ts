@@ -3,6 +3,7 @@ declare global {
   interface Window {
     __crCam?: { cam: { goal: { x: number; z: number; yaw: number; dist: number } }; jump: (p: object) => void };
     __crPerf?: { calls: number; triangles: number; fps: number };
-    __crGame?: { sim: { units: any[]; step: () => unknown } };
+    __crGame?: { sim: { units: any[]; step: () => unknown; tick: number } };
+    __crStart?: (d: string) => void;
   }
 }
