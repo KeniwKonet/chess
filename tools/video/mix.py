@@ -18,7 +18,7 @@ for i, c in enumerate(cues, start=1):
     parts.append(f"[{i}:a]aresample=48000,adelay={ms}|{ms}[a{i}]")
 mix = "".join(f"[a{i}]" for i in range(1, len(cues) + 1))
 # Mono voice to both ears, mixed without level-halving, then gentle loudness levelling.
-parts.append(f"{mix}amix=inputs={len(cues)}:normalize=0:dropout_transition=0,volume=-2dB,loudnorm=I=-16:TP=-1.5:LRA=11,aformat=channel_layouts=stereo[voice]")
+parts.append(f"{mix}amix=inputs={len(cues)}:normalize=0:dropout_transition=0,volume=-2dB,loudnorm=I=-16:TP=-1.5:LRA=11,aformat=channel_layouts=stereo,apad[voice]")
 args += [
     "-filter_complex", ";".join(parts),
     "-map", "0:v", "-map", "[voice]",
