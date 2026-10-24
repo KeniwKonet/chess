@@ -69,6 +69,9 @@ console.log('setup:', 'fonts');
 await page.evaluate(() => document.fonts.ready);
 // From here on, the game renders only when this script asks (one render per video frame).
 await page.evaluate(() => window.__manual());
+// Freeze the fake clock: from now on game time moves only by runFor, never with wall time
+// (otherwise the slow software renderer would make the battle run several times too fast).
+await page.clock.pauseAt(await page.evaluate(() => Date.now() + 50));
 /** Advance game time without recording, rendering now and then (setup only). */
 async function idle(ms) {
   for (let t = 0; t < ms; t += 250) {
@@ -131,7 +134,7 @@ await page.evaluate(() => {
   };
   el('g-cap');
   el('g-card');
-  el('g-ff', 'Fast-forward ×4');
+  el('g-ff', '');
   el('g-ripple');
   el(
     'g-cursor',
@@ -161,7 +164,9 @@ await page.evaluate(() => {
       const d = s.rip.size;
       Object.assign(r.style, { left: `${s.rip.x - d / 2}px`, top: `${s.rip.y - d / 2}px`, width: `${d}px`, height: `${d}px`, opacity: s.rip.a, borderColor: s.rip.color });
     }
-    document.getElementById('g-ff').style.display = s.ff ? 'block' : 'none';
+    const ff = document.getElementById('g-ff');
+    ff.style.display = s.ff ? 'block' : 'none';
+    if (s.ff) ff.textContent = `Fast-forward ×${s.ff}`;
   };
 });
 
@@ -195,7 +200,7 @@ async function frame() {
       capFade = null;
     }
   }
-  ov.ff = speed > 1;
+  ov.ff = speed > 1 ? speed : 0;
   await page.evaluate((s) => {
     window.__ov(s);
     window.__frame();
@@ -417,7 +422,10 @@ await clickAt(p.x, p.y, 'right', 0.8);
 await hold(1.0);
 ov.cursor = false;
 await fly({ x: ford.x - 3, z: ford.z, dist: 24, yaw: 0 });
-await hold(3.0);
+await hold(1.5);
+speed = 2;
+await hold(2.0);
+speed = 1;
 await hideCaption();
 
 // 6. Capture.
@@ -426,7 +434,9 @@ await caption(
   'Take the ground',
   'Stand inside a <b>ring</b> to capture it, as long as no enemy is inside. Hold the <b>Ford of Ash</b>, the <b>Old Mill</b> and <b>Vey Watchtower</b>. Vey lets your soldiers see further.',
 );
+speed = 2;
 await until(() => window.__crGame.sim.captures.find((c) => c.id === 'ford')?.owner === 'sun', 25);
+speed = 1;
 await hold(2.0);
 await hideCaption();
 
@@ -449,7 +459,9 @@ await fly({ x: ford.x + 6, z: ford.z, dist: 46, yaw: 0 });
 await hold(4.2);
 await hideCaption();
 await fly({ x: ford.x + 2, z: ford.z, dist: 22, yaw: 0 });
+speed = 2;
 await until(() => window.__crGame.sim.units.some((u) => u.side === 'moon' && u.hp > 0 && window.__crGame.sim.sees('sun', u.x, u.z)), 12);
+speed = 1;
 await caption(
   '7 / 9',
   'Fight',
