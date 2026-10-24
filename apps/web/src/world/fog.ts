@@ -49,8 +49,18 @@ export function updateFog(visible: Uint8Array, explored: Uint8Array) {
   tex.needsUpdate = true;
 }
 
-/** Add fog shading to a material, keeping any shader changes it already has. */
+/** Materials that already have fog shading (a WeakSet, because clone() copies userData). */
+const fogged = new WeakSet<THREE.Material>();
+
+/**
+ * Add fog shading to a material, keeping any shader changes it already has.
+ * Idempotent: the kit's shared materials are set up again whenever the canvas
+ * remounts (e.g. a quality change), and wrapping twice would declare the fog
+ * varying twice, fail to compile, and make every mesh using it vanish.
+ */
 export function withFog<T extends THREE.Material>(mat: T): T {
+  if (fogged.has(mat)) return mat;
+  fogged.add(mat);
   const prev = mat.onBeforeCompile;
   const prevKey = mat.customProgramCacheKey?.bind(mat);
   mat.onBeforeCompile = (shader, renderer) => {
