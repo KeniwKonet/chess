@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useFrame, useLoader, useThree } from '@react-three/fiber';
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
@@ -8,6 +8,8 @@ import { buildKit, KIT_URL, liteModel, mergeChunks, windTime, type Kit } from '.
 import { realm, buildingById } from '../game';
 import { layout } from './layout';
 import { useUi, type Quality } from '../state/ui';
+import { game, PLAYER } from '../sim/runner';
+import { fogUniforms, updateFog } from './fog';
 
 export function useKit(): Kit {
   const gltf = useLoader(GLTFLoader, KIT_URL, (loader) => {
@@ -24,13 +26,18 @@ export function World() {
   const kit = useKit();
   const addLog = useUi((s) => s.addLog);
   const quality = useUi((s) => s.quality);
+  // Rebuild (rarely) when a building falls, so it is drawn as rubble.
+  const [rev, setRev] = useState(game.worldRev);
+  useFrame(() => {
+    if (game.worldRev !== rev) setRev(game.worldRev);
+  });
   const built = useMemo(() => {
-    const l = layout(realm);
+    const l = layout(realm, (id) => !!game.sim.building(id)?.destroyed);
     const lod = (items: typeof l.props) => (quality === 'high' ? items : items.map((it) => ({ ...it, model: liteModel(kit, it.model) })));
     const tiles = mergeChunks(kit, l.tiles, { name: 'tiles', chunk: 16, castShadow: false, receiveShadow: true, ground: true });
     const solids = mergeChunks(kit, [...lod(l.props), ...lod(l.buildings)], { name: 'props', chunk: 16, castShadow: true, receiveShadow: true });
     return { l, groups: [tiles.group, solids.group], missing: [...tiles.missing, ...solids.missing] };
-  }, [kit, quality]);
+  }, [kit, quality, rev]);
   useEffect(
     () => () => built.groups.forEach((g) => g.traverse((o) => (o as THREE.Mesh).geometry?.dispose())),
     [built],
@@ -164,3 +171,17 @@ export function WindClock() {
 }
 
 export const castlePos = () => toWorld(buildingById.get('sun_castle')!);
+
+/** Pushes the player's fog of war to the GPU a few times a second; off on the title screen. */
+export function FogUpdater() {
+  const t = useRef(0);
+  useFrame((_, dt) => {
+    const playing = useUi.getState().screen !== 'title';
+    fogUniforms.uFogOn.value += ((playing ? 1 : 0) - fogUniforms.uFogOn.value) * Math.min(1, dt * 3);
+    t.current += dt;
+    if (t.current < 0.25) return;
+    t.current = 0;
+    updateFog(game.sim.visible[PLAYER], game.sim.explored[PLAYER]);
+  });
+  return null;
+}

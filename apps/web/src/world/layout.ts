@@ -25,7 +25,8 @@ export function place(x: number, y: number, z: number, rotY = 0, scale = 1): THR
 /** Buildings with separately animated parts, drawn individually rather than instanced. */
 export const ANIMATED_TYPES = new Set(['farm', 'village', 'workshop']);
 
-export function layout(realm: RealmMap) {
+/** `destroyed` reports buildings that have fallen in this match; they are drawn as rubble. */
+export function layout(realm: RealmMap, destroyed: (id: string) => boolean = () => false) {
   const tiles: Placement[] = [];
   const props: Placement[] = [];
   const buildings: Placement[] = [];
@@ -65,12 +66,13 @@ export function layout(realm: RealmMap) {
 
   for (const b of realm.buildings) {
     const w = toWorld(b);
-    const { model } = buildingModel(b);
-    const m = place(w.x, 0, w.z, b.rotY, b.scale);
-    if (ANIMATED_TYPES.has(b.type)) animated.push({ id: b.id, model, matrix: m });
+    const fallen = destroyed(b.id) && b.type !== 'rubble';
+    const { model } = fallen ? { model: 'building_destroyed' } : buildingModel(b);
+    const m = place(w.x, 0, w.z, b.rotY, fallen ? 1 : b.scale);
+    if (ANIMATED_TYPES.has(b.type) && !fallen) animated.push({ id: b.id, model, matrix: m });
     else buildings.push({ model, matrix: m });
-    if (b.type === 'site') buildings.push({ model: 'building_stage_B', matrix: place(w.x - 0.1, 0, w.z + 0.1, b.rotY + Math.PI / 3, 0.75) });
-    if (b.type === 'castle') {
+    if (b.type === 'site' && !fallen) buildings.push({ model: 'building_stage_B', matrix: place(w.x - 0.1, 0, w.z + 0.1, b.rotY + Math.PI / 3, 0.75) });
+    if (b.type === 'castle' && !fallen) {
       // Banners and supplies on the castle grounds.
       const flag = b.side === 'moon' ? 'flag_blue' : 'flag_yellow';
       for (let i = 0; i < 6; i += 2) {

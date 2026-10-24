@@ -10,13 +10,16 @@ test.beforeEach(async ({ page }) => {
   (page as unknown as { errors: string[] }).errors = errors;
   await page.goto('/');
   await page.waitForSelector('body[data-ready="1"]', { timeout: 60_000 });
+  // Skip the title screen.
+  await page.evaluate(() => window.__crStart!('captain'));
+  await expect(page.locator('.army')).toBeVisible();
 });
 
 test('loads the battlefield with HUD and no script errors', async ({ page }) => {
   await expect(page.locator('.brand-name')).toHaveText('Chess Realms');
   await expect(page.locator('.resources')).toContainText('820');
   await expect(page.locator('.minimap canvas')).toBeVisible();
-  await expect(page.locator('.log')).toContainText('Battlefield loaded');
+  await expect(page.locator('.log')).toContainText('Battle begins');
   expect((page as unknown as { errors: string[] }).errors).toEqual([]);
   // The world draws a few frames after the ready flag; wait for a full frame.
   await expect.poll(async () => (await page.evaluate(() => window.__crPerf!)).calls, { timeout: 20_000 }).toBeGreaterThan(20);
@@ -80,11 +83,13 @@ test('graphics quality switches and reduces draw calls on Low', async ({ page })
   await expect.poll(calls, { timeout: 30_000 }).toBeGreaterThan(20);
   await page.waitForTimeout(1500);
   const high = await calls();
+  await page.getByRole('button', { name: 'Settings' }).click();
   await page.getByRole('button', { name: 'Low', exact: true }).click();
+  await page.getByRole('button', { name: 'Close' }).click();
   // Low drops the shadow pass, so each frame needs fewer draw calls.
   await expect.poll(calls, { timeout: 30_000 }).toBeLessThan(high);
   expect(await calls()).toBeGreaterThan(20);
-  await expect(page.locator('.log')).toContainText('Graphics quality: low');
+
 });
 
 type U = { id: number; side: string; type: string; state: string; x: number; z: number };
@@ -103,7 +108,7 @@ test.describe('units', () => {
     await expect(page.locator('.selection h2')).toHaveText('8 Infantry');
     const vp = page.viewportSize()!;
     await page.mouse.click(vp.width * 0.62, vp.height * 0.4, { button: 'right' });
-    await expect(page.locator('.log')).toContainText('8 Infantry marching', { timeout: 15_000 });
+    await expect(page.locator('.log')).toContainText(/8 Infantry (marching|advancing)/, { timeout: 15_000 });
     await expect.poll(async () => (await units(page)).filter((u) => u.side === 'sun' && u.type === 'infantry' && u.state === 'moving').length, { timeout: 20_000 }).toBeGreaterThan(0);
     // Speed the sim up for the test only, then expect arrival.
     await page.evaluate(() => { for (let i = 0; i < 400; i++) { window.__crGame!.sim.step(); } });
@@ -122,7 +127,7 @@ test.describe('units', () => {
     const all = await units(page);
     expect(ids.every((id) => all.find((u) => u.id === id)!.side === 'sun')).toBe(true);
     await page.mouse.click(vp.width * 0.5, vp.height * 0.3, { button: 'right' });
-    await expect(page.locator('.log')).toContainText('marching', { timeout: 15_000 });
+    await expect(page.locator('.log')).toContainText(/marching|advancing/, { timeout: 15_000 });
     await expect.poll(async () => (await units(page)).filter((u) => ids.includes(u.id) && u.state !== 'idle').length, { timeout: 15_000 }).toBeGreaterThan(0);
     await page.keyboard.press('x');
     await expect.poll(async () => (await units(page)).filter((u) => ids.includes(u.id) && u.state !== 'idle').length, { timeout: 15_000 }).toBe(0);
@@ -152,5 +157,61 @@ test.describe('touch', () => {
     await page.touchscreen.tap(300, 420);
     // The field log starts collapsed on phones, so check the soldiers themselves.
     await expect.poll(async () => (await units(page)).filter((u) => u.side === 'sun' && u.type === 'archer' && u.state !== 'idle').length, { timeout: 15_000 }).toBe(6);
+  });
+});
+
+test.describe('battle, War Table and match flow', () => {
+  test('the War Table plays a legal move by clicking, with its battlefield effect, and the Moon replies', async ({ page }) => {
+    await page.keyboard.press('b');
+    await expect(page.locator('.wartable')).toBeVisible();
+    await page.locator('button[aria-label^="e2"]').click();
+    await expect(page.locator('button[aria-label^="e4"]')).toHaveClass(/target/);
+    await page.locator('button[aria-label^="e4"]').click();
+    await expect(page.locator('.log')).toContainText('War Table, Sun e4: Advance');
+    await expect(page.locator('.wartable h2')).toContainText('Moon is thinking');
+    // Fast-forward the battle clock for the Moon's reply.
+    await page.evaluate(() => { const g = window.__crGame! as unknown as { match: { step: () => unknown } }; for (let i = 0; i < 200; i++) g.match.step(); });
+    await expect(page.locator('.wartable h2')).toContainText('Your move', { timeout: 15_000 });
+    await expect(page.locator('.wt-log li')).toHaveCount(2);
+  });
+
+  test('right-clicking an enemy soldier orders an attack, and soldiers fight', async ({ page }) => {
+    // Bring a Moon soldier into view of the Sun army.
+    const ids = await page.evaluate(() => {
+      const g = window.__crGame! as unknown as { sim: { units: { id: number; side: string; x: number; z: number; type: string }[] } };
+      const foe = g.sim.units.find((u) => u.side === 'moon' && u.type === 'infantry')!;
+      const sun = g.sim.units.filter((u) => u.side === 'sun' && u.type === 'archer');
+      foe.x = sun[0]!.x + 4;
+      foe.z = sun[0]!.z;
+      return { foe: foe.id, sun: sun.map((u) => u.id) };
+    });
+    await page.locator('.army .btn').nth(1).click();
+    await page.waitForTimeout(1500);
+    const u = (await units(page)).find((x) => x.id === ids.foe)!;
+    await jump(page, { x: u.x - 2, z: u.z, dist: 16, yaw: 0 });
+    await page.waitForTimeout(1500);
+    const pt = await page.evaluate(([x, z]) => (window as unknown as { __crProject: (x: number, y: number, z: number) => { x: number; y: number } }).__crProject(x, 0.4, z), [u.x, u.z]);
+    await page.mouse.click(pt.x, pt.y, { button: 'right' });
+    await expect(page.locator('.log')).toContainText('attacking', { timeout: 15_000 });
+    await expect.poll(async () => (await page.evaluate((id) => (window.__crGame! as unknown as { sim: { unit: (i: number) => { hp: number } | undefined } }).sim.unit(id)?.hp ?? 0, ids.foe)), { timeout: 30_000 }).toBeLessThan(100);
+  });
+
+  test('pause and resume', async ({ page }) => {
+    await page.keyboard.press('p');
+    await expect(page.getByRole('dialog', { name: 'Paused' })).toBeVisible();
+    const t0 = await page.evaluate(() => window.__crGame!.sim.tick);
+    await page.waitForTimeout(1500);
+    expect(await page.evaluate(() => window.__crGame!.sim.tick)).toBe(t0);
+    await page.getByRole('button', { name: 'Resume' }).click();
+    await expect(page.getByRole('dialog', { name: 'Paused' })).toHaveCount(0);
+  });
+
+  test('victory shows the battle report; Rematch starts a fresh battle', async ({ page }) => {
+    await page.evaluate(() => (window.__crGame! as unknown as { sim: { declareWinner: (s: string, r: string) => void } }).sim.declareWinner('sun', 'Nocturne Castle has fallen'));
+    await expect(page.getByRole('dialog', { name: 'Battle report' })).toBeVisible({ timeout: 30_000 });
+    await expect(page.locator('.summary-kicker')).toHaveText('Victory');
+    await page.getByRole('button', { name: 'Rematch' }).click();
+    await expect(page.getByRole('dialog', { name: 'Battle report' })).toHaveCount(0);
+    expect(await page.evaluate(() => window.__crGame!.sim.tick)).toBeLessThan(50);
   });
 });

@@ -4,6 +4,7 @@ import * as THREE from 'three';
 import { toWorld, type Hex } from '@cr/game-core';
 import { realm, buildingById, buildingModel, cellByKey } from '../game';
 import { useUi } from '../state/ui';
+import { game } from '../sim/runner';
 import type { Pick } from '../game';
 
 export const SIDE_HEX = { sun: '#E8B33A', moon: '#5B9BF0', neutral: '#E6DCC3' } as const;
@@ -75,9 +76,19 @@ export function CaptureRings() {
     [],
   );
   const mats = useRef<THREE.MeshBasicMaterial[]>([]);
+  const fills = useRef<THREE.MeshBasicMaterial[]>([]);
   useFrame((state) => {
     const t = state.clock.elapsedTime;
-    mats.current.forEach((m, i) => m && (m.opacity = 0.55 + Math.sin(t * 1.5 + i) * 0.2));
+    // Ring colour follows the live owner; a contested ring pulses faster.
+    game.sim.captures.forEach((c, i) => {
+      const m = mats.current[i];
+      const f = fills.current[i];
+      if (!m || !f) return;
+      const busy = c.owner === 'neutral' ? c.progress !== 0 : Math.abs(c.progress) < 100;
+      m.color.set(SIDE_HEX[c.owner]);
+      f.color.set(SIDE_HEX[c.owner]);
+      m.opacity = 0.55 + Math.sin(t * (busy ? 5 : 1.5) + i) * 0.2;
+    });
   });
   return (
     <>
@@ -87,7 +98,7 @@ export function CaptureRings() {
             <meshBasicMaterial ref={(m) => void (mats.current[i] = m!)} color={it.colour} transparent depthWrite={false} toneMapped={false} />
           </mesh>
           <mesh geometry={it.fill} renderOrder={1}>
-            <meshBasicMaterial color={it.colour} transparent opacity={0.07} depthWrite={false} toneMapped={false} />
+            <meshBasicMaterial ref={(m) => void (fills.current[i] = m!)} color={it.colour} transparent opacity={0.07} depthWrite={false} toneMapped={false} />
           </mesh>
         </group>
       ))}

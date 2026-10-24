@@ -4,7 +4,7 @@ import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { MeshoptDecoder } from 'three/examples/jsm/libs/meshopt_decoder.module.js';
 import { UNIT_DEFS, type UnitType } from '@cr/game-core';
-import { advance, game, renderPos } from '../sim/runner';
+import { advance, game, renderPos, visibleToPlayer, PLAYER } from '../sim/runner';
 import { useUi } from '../state/ui';
 import { cam } from '../camera/camera';
 import { zoomT } from '../camera/rts';
@@ -98,8 +98,11 @@ export function Units() {
       frustum.setFromProjectionMatrix(pv);
       // Full detail close to the camera; the simplified soldier further out.
       const lodDist = useUi.getState().quality === 'high' ? 26 : 17;
-      for (const u of game.sim.units) {
-        if (u.hp <= 0) continue;
+      const sim = game.sim;
+      const now = sim.tick + game.alpha;
+      for (const u of sim.units) {
+        // Enemies in the fog of war are not drawn.
+        if (!visibleToPlayer(u)) continue;
         const p = renderPos(u);
         sphere.center.set(p.x, 0.4, p.z);
         if (!frustum.intersectsSphere(sphere)) continue;
@@ -111,19 +114,26 @@ export function Units() {
         m4.compose(p3.set(p.x, 0, p.z), q, s3.setScalar(model.scale));
         m4.multiply(feetOffset[u.type]);
         l.mesh.setMatrixAt(i, m4);
-        // Animation: idle, or walk/run matched to how far the unit moved this tick.
-        const speed = u.moved / 0.1;
+        // Animation, from the sim state: death, a strike, walk/run matched to speed, cheer, or idle.
         const def = UNIT_DEFS[u.type];
-        let clip: ClipName = 'idle';
-        let rate = 1;
-        if (u.state === 'moving' && speed > 0.05) {
-          clip = speed > def.speed * 1.15 ? 'run' : 'walk';
-          rate = Math.min(1.8, Math.max(0.6, speed / (clip === 'run' ? def.speed * 1.4 : def.speed)));
-        }
+        const speed = u.moved / 0.1;
         const phase = (u.id * 0.37) % 1;
-        const c = model.clips[clip];
-        const [a, b, f] = frameAt(c, game.time * rate + phase * c.duration);
-        l.frame.setXYZ(i, a, b, f);
+        let frame: [number, number, number];
+        if (u.hp <= 0) {
+          frame = frameAt(model.clips.death, (now - u.deadAt) * 0.1, false);
+        } else if (u.lastAttack >= 0 && (now - u.lastAttack) * 0.1 < model.clips.attack.duration) {
+          frame = frameAt(model.clips.attack, (now - u.lastAttack) * 0.1, false);
+        } else if (u.state === 'moving' && speed > 0.05) {
+          const clip: ClipName = speed > def.speed * 1.15 ? 'run' : 'walk';
+          const rate = Math.min(1.8, Math.max(0.6, speed / (clip === 'run' ? def.speed * 1.4 : def.speed)));
+          const c = model.clips[clip];
+          frame = frameAt(c, game.time * rate + phase * c.duration);
+        } else if (sim.winner === u.side) {
+          frame = frameAt(model.clips.cheer, game.time + phase * model.clips.cheer.duration);
+        } else {
+          frame = frameAt(model.clips.idle, game.time + phase * model.clips.idle.duration);
+        }
+        l.frame.setXYZ(i, frame[0], frame[1], frame[2]);
       }
     }
     for (const l of layers) {
@@ -209,18 +219,89 @@ export function UnitMarks() {
   const s3 = useMemo(() => new THREE.Vector3(), []);
   const white = useMemo(() => new THREE.Color('#FFFFFF'), []);
 
-  useFrame(() => {
+  // Health bars: a dark back and a coloured fill, both camera-facing quads.
+  const bars = useMemo(() => {
+    const geo = new THREE.PlaneGeometry(1, 1);
+    const mk = (color: string, order: number) => {
+      const m = new THREE.InstancedMesh(geo, new THREE.MeshBasicMaterial({ color, depthWrite: false, toneMapped: false, transparent: true }), CAP * 2);
+      m.count = 0;
+      m.frustumCulled = false;
+      m.renderOrder = order;
+      return m;
+    };
+    return { back: mk('#14100b', 5), fill: mk('#ffffff', 6) };
+  }, []);
+  const barGreen = useMemo(() => new THREE.Color('#7fe06a'), []);
+  const barRed = useMemo(() => new THREE.Color('#f0604f'), []);
+
+  // Arrows in flight.
+  const arrows = useMemo(() => {
+    const geo = new THREE.CylinderGeometry(0.018, 0.018, 0.42, 4);
+    geo.rotateX(Math.PI / 2); // along +z
+    const m = new THREE.InstancedMesh(geo, new THREE.MeshBasicMaterial({ color: '#3a2a18' }), 256);
+    m.count = 0;
+    m.frustumCulled = false;
+    return m;
+  }, []);
+  const look = useMemo(() => new THREE.Matrix4(), []);
+  const from = useMemo(() => new THREE.Vector3(), []);
+  const to = useMemo(() => new THREE.Vector3(), []);
+  const up = useMemo(() => new THREE.Vector3(0, 1, 0), []);
+
+  useFrame(({ camera }) => {
+    const sim = game.sim;
+    const now = sim.tick + game.alpha;
+    bars.back.count = 0;
+    bars.fill.count = 0;
+    arrows.count = 0;
+    for (const pr of sim.projectiles) {
+      if (!pr.visible || arrows.count >= 256) continue;
+      const span = Math.max(1, pr.lands - pr.fired);
+      const t = Math.min(1, Math.max(0, (now - pr.fired) / span));
+      const tp = sim.targetPos(pr.target);
+      const tx = tp?.x ?? pr.tx;
+      const tz = tp?.z ?? pr.tz;
+      const dist = Math.hypot(tx - pr.x0, tz - pr.z0);
+      const arc = (y: number) => y + dist * 0.12 * 4 * t * (1 - t);
+      const x = pr.x0 + (tx - pr.x0) * t;
+      const z = pr.z0 + (tz - pr.z0) * t;
+      if (!sim.sees(PLAYER, x, z)) continue;
+      const y = arc(pr.y0 + (0.45 - pr.y0) * t);
+      // Point along the flight path.
+      const t2 = Math.min(1, t + 0.05);
+      from.set(x, y, z);
+      to.set(pr.x0 + (tx - pr.x0) * t2, pr.y0 + (0.45 - pr.y0) * t2 + dist * 0.12 * 4 * t2 * (1 - t2), pr.z0 + (tz - pr.z0) * t2);
+      look.lookAt(to, from, up);
+      m4.copy(look).setPosition(from);
+      arrows.setMatrixAt(arrows.count++, m4);
+    }
+    arrows.instanceMatrix.needsUpdate = true;
     const tokensOn = zoomT(cam.current.dist) > TOKEN_ZOOM || !unitAssets.ready;
     const ui = useUi.getState();
     const selected = new Set(ui.selectedUnits);
     for (const t of tokens) t.mesh.count = 0;
     shadows.count = 0;
     rings.count = 0;
-    for (const u of game.sim.units) {
-      if (u.hp <= 0) continue;
+    for (const u of sim.units) {
+      if (u.hp <= 0 || !visibleToPlayer(u)) continue;
       const p = renderPos(u);
       m4.makeTranslation(p.x, 0.02, p.z);
       shadows.setMatrixAt(shadows.count++, m4);
+      // Health bar for the wounded and the selected.
+      if ((u.hp < u.maxHp || selected.has(u.id)) && bars.fill.count < CAP * 2) {
+        const pct = u.hp / u.maxHp;
+        const w = tokensOn ? 0.9 : 0.5;
+        const h = tokensOn ? 0.09 : 0.055;
+        const y = tokensOn ? 1.75 : 0.98;
+        m4.compose(p3.set(p.x, y, p.z), camera.quaternion, s3.set(w + 0.04, h + 0.03, 1));
+        bars.back.setMatrixAt(bars.back.count++, m4);
+        // Fill anchored on the left edge (in camera space).
+        const off = new THREE.Vector3(-(w * (1 - pct)) / 2, 0, 0.001).applyQuaternion(camera.quaternion);
+        m4.compose(p3.set(p.x + off.x, y + off.y, p.z + off.z), camera.quaternion, s3.set(Math.max(0.001, w * pct), h, 1));
+        bars.fill.setMatrixAt(bars.fill.count, m4);
+        bars.fill.setColorAt(bars.fill.count, u.side === PLAYER ? barGreen : barRed);
+        bars.fill.count++;
+      }
       const sel = selected.has(u.id);
       if (sel || ui.hoveredUnit === u.id) {
         const r = (sel ? 1 : 0.85) * (tokensOn ? 1.5 : 1);
@@ -242,6 +323,9 @@ export function UnitMarks() {
       if (t.mesh.instanceColor) t.mesh.instanceColor.needsUpdate = true;
     }
     shadows.instanceMatrix.needsUpdate = true;
+    bars.back.instanceMatrix.needsUpdate = true;
+    bars.fill.instanceMatrix.needsUpdate = true;
+    if (bars.fill.instanceColor) bars.fill.instanceColor.needsUpdate = true;
     rings.instanceMatrix.needsUpdate = true;
     if (rings.instanceColor) rings.instanceColor.needsUpdate = true;
 
@@ -259,7 +343,7 @@ export function UnitMarks() {
       m.position.set(mk.x, 0.05, mk.z);
       const mat = m.material as THREE.MeshBasicMaterial;
       mat.opacity = Math.max(0, 1 - age);
-      mat.color.set(mk.ok ? '#8CF08C' : '#F2C14E');
+      mat.color.set(mk.attack ? '#F0604F' : mk.ok ? '#8CF08C' : '#F2C14E');
     });
   });
 
@@ -270,6 +354,9 @@ export function UnitMarks() {
       ))}
       <primitive object={shadows} />
       <primitive object={rings} />
+      <primitive object={bars.back} />
+      <primitive object={bars.fill} />
+      <primitive object={arrows} />
       {markerMeshes.map((m, i) => (
         <primitive key={i} object={m} />
       ))}

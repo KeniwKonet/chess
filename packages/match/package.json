@@ -1,0 +1,2 @@
+{ "name": "@cr/match", "version": "0.1.0", "private": true, "type": "module", "main": "src/index.ts", "types": "src/index.ts",
+  "dependencies": { "@cr/game-core": "workspace:*", "@cr/chess-core": "workspace:*", "chess.js": "1.4.0" } }

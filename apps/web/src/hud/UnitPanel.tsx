@@ -2,7 +2,7 @@ import { useEffect, useReducer } from 'react';
 import { fromWorld, key, moveCost, UNIT_DEFS, type Unit, type UnitType } from '@cr/game-core';
 import { useUi, IS_MOBILE } from '../state/ui';
 import { cellByKey, nearestPlaceXZ } from '../game';
-import { game, orderStop, ownUnits, PLAYER, describeUnits } from '../sim/runner';
+import { game, orderStop, ownUnits, PLAYER, describeUnits, targetName } from '../sim/runner';
 import { focusPick } from '../camera/CameraRig';
 
 /** Re-render while units are moving (positions change every tick), otherwise only on events. */
@@ -19,7 +19,13 @@ function useLiveUnits(ids: number[]) {
   return ids.map((id) => game.sim.unit(id)).filter((u): u is Unit => !!u && u.hp > 0);
 }
 
-const STATE_TEXT = { idle: 'Holding position', waiting: 'Finding a path', moving: 'Marching' } as const;
+const STATE_TEXT = { idle: 'Holding position', waiting: 'Finding a path', moving: 'Marching', attacking: 'Fighting', dead: 'Fallen' } as const;
+
+function doing(u: Unit) {
+  if (u.target && (u.state === 'attacking' || u.state === 'moving' || u.state === 'waiting')) return `${u.state === 'attacking' ? 'Fighting' : 'Closing on'} ${targetName(u.target)}`;
+  if (u.attackMove && u.goal) return `Advancing to fight ${nearestPlaceXZ(u.goal.x, u.goal.z, true)}`;
+  return `${STATE_TEXT[u.state]} ${u.goal ? nearestPlaceXZ(u.goal.x, u.goal.z, true) : nearestPlaceXZ(u.x, u.z, false)}`;
+}
 
 function terrainNote(u: Unit) {
   const c = cellByKey.get(key(fromWorld(u.x, u.z)));
@@ -49,33 +55,41 @@ export function UnitPanel() {
           <div>
             <div className="sel-kicker">{def.plural} · {own ? 'Yours (Sun)' : 'Enemy (Moon)'}</div>
             <h2>{u.name}</h2>
-            <div className="sel-where">
-              {STATE_TEXT[u.state]} {u.goal ? nearestPlaceXZ(u.goal.x, u.goal.z, true) : nearestPlaceXZ(u.x, u.z, false)}
-            </div>
+            <div className="sel-where">{doing(u)}</div>
           </div>
           <button className="btn icon" onClick={() => selectUnits([])} aria-label="Close">×</button>
         </header>
         <div className="hp">
-          <div className="hp-row"><span>Health</span><span>{u.hp} / {u.maxHp}</span></div>
+          <div className="hp-row"><span>Health</span><span>{Math.ceil(u.hp)} / {u.maxHp}</span></div>
           <div className="bar-track big"><div className="bar-fill" style={{ width: `${pct}%` }} /></div>
         </div>
-        <p className="sel-text">{terrainNote(u)}</p>
+        <p className="sel-text">
+          {terrainNote(u)}
+          <br />
+          {def.ranged ? `Shoots ${def.range} units` : 'Fights hand to hand'} · {def.damage} damage{u.kills ? ` · ${u.kills} kill${u.kills > 1 ? 's' : ''}` : ''}
+          {u.buffs.some((b) => b.until >= game.sim.tick) ? ` · ${[...new Set(u.buffs.filter((b) => b.until >= game.sim.tick).map((b) => b.source))].join(', ')}` : ''}
+        </p>
         <UnitActions own={own} onFocus={() => { focusPick(); addLog(`Camera focused on ${u.name}`, 'system'); }} moving={u.state !== 'idle'} />
-        <p className="sel-foot">{own ? (IS_MOBILE ? 'Tap the map to send them there.' : 'Right-click the map to send them there.') : 'Moon soldiers can be inspected but not commanded.'} Combat starts in milestone 3.</p>
+        <p className="sel-foot">{own ? (IS_MOBILE ? 'Tap the map to move, or an enemy to attack.' : 'Right-click the map to move, or an enemy to attack. T then click: attack-move.') : 'Moon soldiers can be inspected but not commanded.'}</p>
       </section>
     );
   }
 
   const byType = new Map<UnitType, Unit[]>();
   for (const u of units) byType.set(u.type, [...(byType.get(u.type) ?? []), u]);
-  const moving = units.filter((u) => u.state !== 'idle').length;
+  const moving = units.filter((u) => u.state === 'moving' || u.state === 'waiting').length;
+  const fighting = units.filter((u) => u.state === 'attacking').length;
   return (
     <section className={`selection panel side-${side}`} aria-label="Selected soldiers">
       <header>
         <div>
           <div className="sel-kicker">{own ? 'Your soldiers (Sun)' : 'Enemy soldiers (Moon)'}</div>
           <h2>{describeUnits(units.map((u) => u.id))}</h2>
-          <div className="sel-where">{moving ? `${moving} marching, ${units.length - moving} holding` : `Holding position ${nearestPlaceXZ(units[0]!.x, units[0]!.z, false)}`}</div>
+          <div className="sel-where">
+            {moving || fighting
+              ? [fighting && `${fighting} fighting`, moving && `${moving} marching`, units.length - moving - fighting && `${units.length - moving - fighting} holding`].filter(Boolean).join(', ')
+              : `Holding position ${nearestPlaceXZ(units[0]!.x, units[0]!.z, false)}`}
+          </div>
         </div>
         <button className="btn icon" onClick={() => selectUnits([])} aria-label="Close">×</button>
       </header>
@@ -85,8 +99,8 @@ export function UnitPanel() {
             <button
               key={u.id}
               role="listitem"
-              className={`roster-chip type-${type}${u.state !== 'idle' ? ' moving' : ''}`}
-              title={`${u.name}: ${STATE_TEXT[u.state]}. Click to select only this soldier.`}
+              className={`roster-chip type-${type}${u.state === 'moving' || u.state === 'waiting' ? ' moving' : ''}${u.state === 'attacking' ? ' fighting' : ''}`}
+              title={`${u.name}: ${doing(u)}. Click to select only this soldier.`}
               onClick={() => selectUnits([u.id])}
             >
               <span className="roster-glyph" aria-hidden="true">{type === 'infantry' ? '♟' : '♝'}</span>
@@ -95,20 +109,24 @@ export function UnitPanel() {
           )),
         )}
       </div>
-      <UnitActions own={own} onFocus={() => { focusPick(); addLog('Camera focused on the selection', 'system'); }} moving={moving > 0} />
-      <p className="sel-foot">{own ? (IS_MOBILE ? 'Tap the map to send them there. They form up in ranks, infantry in front.' : 'Right-click the map to send them. They form up in ranks, infantry in front.') : 'Moon soldiers can be inspected but not commanded.'}</p>
+      <UnitActions own={own} onFocus={() => { focusPick(); addLog('Camera focused on the selection', 'system'); }} moving={moving + fighting > 0} />
+      <p className="sel-foot">{own ? (IS_MOBILE ? 'Tap the map to move (they form ranks, infantry in front), or an enemy to attack.' : 'Right-click to move (they form ranks, infantry in front) or to attack an enemy. T then click: attack-move.') : 'Moon soldiers can be inspected but not commanded.'}</p>
     </section>
   );
 }
 
 function UnitActions({ own, onFocus, moving }: { own: boolean; onFocus: () => void; moving: boolean }) {
+  const attackMode = useUi((s) => s.attackMode);
+  const setAttackMode = useUi((s) => s.setAttackMode);
   return (
     <div className="sel-actions">
       <button className="btn" onClick={onFocus}>Focus (F)</button>
       {own && (
         <>
           <button className="btn" onClick={() => orderStop()} disabled={!moving} title="Stop and hold position (X)">Stop (X)</button>
-          <button className="btn btn-locked" disabled title="Attacking needs combat, which arrives in milestone 3">Attack <small>M3</small></button>
+          <button className={`btn${attackMode ? ' on' : ''}`} aria-pressed={attackMode} onClick={() => setAttackMode(!attackMode)} title="Attack-move: then click (or tap) where to advance; they fight anything on the way (T)">
+            Attack-move (T)
+          </button>
         </>
       )}
     </div>
