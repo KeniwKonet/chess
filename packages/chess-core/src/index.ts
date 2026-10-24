@@ -39,6 +39,20 @@ export class StandardGame {
   inCheck() {
     return this.chess.inCheck();
   }
+  /** Legal moves with from/to squares (optionally only from one square). */
+  verboseMoves(from?: Square): { san: string; from: Square; to: Square; captured?: string; promotion?: string }[] {
+    return (from ? this.chess.moves({ square: from, verbose: true }) : this.chess.moves({ verbose: true })).map((m) => ({
+      san: m.san,
+      from: m.from,
+      to: m.to,
+      ...(m.captured ? { captured: m.captured } : {}),
+      ...(m.promotion ? { promotion: m.promotion } : {}),
+    }));
+  }
+  /** Piece on a square, if any. */
+  pieceAt(sq: Square): { type: string; color: 'w' | 'b' } | null {
+    return this.chess.get(sq) ?? null;
+  }
   legalMoves(from?: Square): string[] {
     return from ? this.chess.moves({ square: from }) : this.chess.moves();
   }
@@ -74,3 +88,5 @@ export class StandardGame {
     return { over: false };
   }
 }
+export * from './bonds';
+export type { Square } from 'chess.js';
