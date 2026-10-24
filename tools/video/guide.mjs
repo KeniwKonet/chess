@@ -94,7 +94,7 @@ await idle(800);
 console.log('setup:', 'await page.addStyleTag({');
 await page.addStyleTag({
   content: `
-#g-cap{position:fixed;left:50%;bottom:22px;transform:translateX(-50%);width:600px;z-index:2147483000;pointer-events:none;
+#g-cap{position:fixed;left:660px;bottom:22px;transform:translateX(-50%);width:584px;z-index:2147483000;pointer-events:none;
   background:rgba(22,17,12,.94);border:1px solid rgba(232,190,110,.55);border-radius:14px;padding:13px 18px 14px;
   box-shadow:0 10px 30px rgba(0,0,0,.45);font-family:Barlow,system-ui,sans-serif;color:#F3E9D8}
 #g-cap .k{display:flex;align-items:center;gap:10px;font:600 13px/1 'Barlow Condensed',sans-serif;letter-spacing:.14em;text-transform:uppercase;color:#E8BE6E;margin-bottom:6px}
@@ -317,6 +317,8 @@ await sim(() => {
   const g = window.__crGame;
   g.match.commander = null;
   g.match.patrol = null;
+  // Keep the Moon's towers quiet so the demonstration fight at the ford isn't decided by tower fire.
+  for (const b of g.sim.buildings) if (b.side === 'moon' && b.type === 'tower') b.weapon = null;
 });
 const W0 = await sim(() => {
   const s = window.__crGame.sim;
@@ -432,8 +434,8 @@ await hideCaption();
 await sim((f) => {
   const s = window.__crGame.sim;
   const moon = s.units.filter((u) => u.side === 'moon');
-  const inf = moon.filter((u) => u.type === 'infantry').slice(0, 4);
-  const arc = moon.filter((u) => u.type === 'archer').slice(0, 2);
+  const inf = moon.filter((u) => u.type === 'infantry').slice(0, 3);
+  const arc = moon.filter((u) => u.type === 'archer').slice(0, 1);
   [...inf, ...arc].forEach((u, i) => {
     u.x = f.x + 9 + (i % 3) * 0.8;
     u.z = f.z - 1 + Math.floor(i / 3) * 0.9;
@@ -476,9 +478,19 @@ await hold(1.6);
 await moveTo(640, 300, 0.5);
 await page.keyboard.press('b');
 await hold(1.4);
-await clickEl(page.locator('button[aria-label^="e2"]'));
+// Play a pawn whose soldier is still alive, so the move visibly gives an order.
+const file = await sim(() => {
+  const wt = window.__crGame.match.warTable;
+  for (const f of ['e', 'd', 'c', 'f', 'b', 'g', 'a', 'h']) {
+    const b = wt.bonds.on(`${f}2`);
+    if (b && b.role === 'p' && !wt.bonds.leaderless(b, wt.live) && wt.targets(`${f}2`).includes(`${f}4`)) return f;
+  }
+  return 'e';
+});
+console.log('pawn file', file);
+await clickEl(page.locator(`button[aria-label^="${file}2"]`));
 await hold(0.4);
-await clickEl(page.locator('button[aria-label^="e4"]'));
+await clickEl(page.locator(`button[aria-label^="${file}4"]`));
 await hold(1.8);
 await hideCaption();
 await caption(
