@@ -1,0 +1,20 @@
+{
+  "intro": "Welcome to Chess Realms: a real-time battle and a game of chess, fought at the same time. Every chess move gives orders to your army. Here's how to play.",
+  "start": "Start by choosing how tough the Moon should be. Recruit is the gentlest. Then press, Begin the battle.",
+  "goal": "You lead the Sun, in gold, in the west. The Moon, in blue, holds the east, across the river. You win by destroying Nocturne Castle, or by checkmating the Moon on the War Table.",
+  "camera": "To look around, right-drag to pan, and scroll to zoom. Q and E turn the view, and N faces north again. On a phone, just drag, pinch, and twist.",
+  "select": "Now, choose your soldiers. Use the army buttons at the top left for infantry, archers, or everyone. You can also click a single soldier, or drag a box around a group.",
+  "march": "Right-click the ground to march there. Your soldiers find their own way. Roads are fastest, and the river can only be crossed at the bridges and the ford.",
+  "capture": "Stand inside a ring to capture it, as long as no enemy is inside. Hold the Ford of Ash, the Old Mill, and Vey Watchtower. Vey lets your soldiers see further.",
+  "fog": "The darker ground is fog of war. You only see enemies close to your soldiers and buildings, so scout before you charge.",
+  "fight": "Enemies in sight! Right-click an enemy to attack it. Or press T, then right-click, to attack-move: your soldiers march, and fight anything on the way.",
+  "wt1": "Now, the War Table. Press B, or the War Table button. It's a real game of chess against the Moon, played during the battle. You can move whenever it says: your move.",
+  "wt2": "Every piece commands part of your army. Moving a pawn sends its soldier forward. Bishops make archers shoot faster, rooks power up towers, the queen rallies everyone, and the king repairs your castle.",
+  "wt3": "The Moon thinks, then replies. Capturing a piece weakens the soldiers it commands, and checkmate wins the whole battle.",
+  "details": "Click a soldier to see its health, and what it's doing. Every ninety seconds, your barracks and archery range send reinforcements. Towers and castles shoot at enemies nearby.",
+  "pause": "Press P, or the pause button, to take a breather at any time. The question mark key shows every control.",
+  "later": "Later in the battle, the Sun storms Nocturne.",
+  "victory": "Bring down Nocturne Castle, or checkmate the Moon, to win. The battle report shows how the fight went.",
+  "tips": "A few tips for your first battle. Keep your archers behind your infantry. Take the Ford of Ash early: it's the shortest way across the river. Play the War Table between fights. A bishop or queen move, just before a clash, makes your army stronger. And if you lose track, press the question mark key.",
+  "outro": "Now, take the field. Good luck, commander."
+}

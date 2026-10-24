@@ -223,12 +223,30 @@ async function until(fn, max, arg) {
   return false;
 }
 
+// ---- narration: each line starts with its scene, and the scene waits for the line to finish.
+const VOICE = process.env.VOICE_DIR ? JSON.parse(fs.readFileSync(path.join(process.env.VOICE_DIR, 'durations.json'), 'utf8')) : {};
+const cues = [];
+let voiceEnd = 0; // frame index when the current line finishes
+const GAP = 0.35; // seconds of quiet between lines
+async function say(id) {
+  if (!(id in VOICE)) return;
+  if (n < voiceEnd + GAP * FPS) await hold((voiceEnd + GAP * FPS - n) / FPS);
+  cues.push({ id, frame: n, t: +(n / FPS).toFixed(3) });
+  voiceEnd = n + VOICE[id] * FPS;
+}
+/** Hold until the current line has finished (plus a short breath). */
+async function waitVoice(extra = GAP) {
+  const left = voiceEnd + extra * FPS - n;
+  if (left > 0) await hold(left / FPS);
+}
+
 async function caption(step, title, html) {
   ov.cap = true;
   ov.capHtml = `<div class="k">${step ? `<span class="n">${step}</span>` : ''}<span>${title}</span></div><div class="t">${html}</div>`;
   capFade = { from: 0, to: 1, t: 0, dur: Math.round(0.3 * FPS) };
 }
 async function hideCaption() {
+  await waitVoice();
   capFade = { from: ov.capA, to: 0, t: 0, dur: Math.round(0.25 * FPS) };
 }
 async function card(html, s, fadeIn = 0.5, fadeOut = 0.5) {
@@ -239,7 +257,7 @@ async function card(html, s, fadeIn = 0.5, fadeOut = 0.5) {
     await frame();
   }
   ov.cardA = 1;
-  await hold(s);
+  await hold(Math.max(s, (voiceEnd - n) / FPS + GAP));
   const fo = Math.round(fadeOut * FPS);
   for (let i = 0; i < fo; i++) {
     ov.cardA = 1 - (i + 1) / fo;
@@ -299,6 +317,7 @@ const sim = (fn, arg) => page.evaluate(fn, arg);
 console.log('setup:', '// Intro card over the title screen.');
 // Intro card over the title screen.
 ov.cursor = false;
+await say('intro');
 await card(
   `<div><div class="kick">A two-minute guide</div><h1>How to play<br>Chess Realms</h1><div class="rule"></div>
    <p>A real-time battle and a game of chess, fought at the same time.<br>Every chess move gives orders to your army.</p></div>`,
@@ -310,6 +329,7 @@ await card(
 // 1. Start.
 ov.cx = 900;
 ov.cy = 560;
+await say('start');
 await caption('1 / 9', 'Start a battle', 'Choose how tough the <span class="moon">Moon</span> should be. <b>Recruit</b> is the gentlest. Then press <b>Begin the battle</b>.');
 await hold(1.4);
 await clickEl(page.locator('label.diff').nth(0), 'left', 0.8);
@@ -343,6 +363,7 @@ await hideCaption();
 
 // 2. The goal.
 ov.cursor = false;
+await say('goal');
 await caption(
   '2 / 9',
   'Your goal',
@@ -357,6 +378,7 @@ await hold(2.6);
 await hideCaption();
 
 // 3. Camera.
+await say('camera');
 await caption(
   '3 / 9',
   'Look around',
@@ -389,6 +411,7 @@ const army = await sim(() => {
 });
 await fly({ x: (army.inf.x + army.arc.x) / 2, z: (army.inf.z + army.arc.z) / 2, dist: 20, yaw: 0 });
 await hold(0.4);
+await say('select');
 await caption(
   '4 / 9',
   'Choose your soldiers',
@@ -410,6 +433,7 @@ await hideCaption();
 
 // 5. Move.
 const ford = W0.captures.ford ?? Object.values(W0.captures)[0];
+await say('march');
 await caption(
   '5 / 9',
   'March',
@@ -429,6 +453,7 @@ speed = 1;
 await hideCaption();
 
 // 6. Capture.
+await say('capture');
 await caption(
   '6 / 9',
   'Take the ground',
@@ -454,6 +479,7 @@ await sim((f) => {
 }, ford);
 
 // 7. Fog, then fight.
+await say('fog');
 await caption('7 / 9', 'Fog of war', 'Darker ground is <b>fog of war</b>. You only see enemies close to your soldiers and buildings, so scout before you charge.');
 await fly({ x: ford.x + 6, z: ford.z, dist: 46, yaw: 0 });
 await hold(4.2);
@@ -462,6 +488,7 @@ await fly({ x: ford.x + 2, z: ford.z, dist: 22, yaw: 0 });
 speed = 2;
 await until(() => window.__crGame.sim.units.some((u) => u.side === 'moon' && u.hp > 0 && window.__crGame.sim.sees('sun', u.x, u.z)), 12);
 speed = 1;
+await say('fight');
 await caption(
   '7 / 9',
   'Fight',
@@ -481,6 +508,7 @@ await hold(1.2);
 await hideCaption();
 
 // 8. War Table.
+await say('wt1');
 await caption(
   '8 / 9',
   'The War Table',
@@ -505,6 +533,7 @@ await hold(0.4);
 await clickEl(page.locator(`button[aria-label^="${file}4"]`));
 await hold(1.8);
 await hideCaption();
+await say('wt2');
 await caption(
   '8 / 9',
   'Every piece commands part of your army',
@@ -516,6 +545,7 @@ await hold(0.4);
 await moveTo(650, 600, 0.6);
 await hold(5.2);
 await hideCaption();
+await say('wt3');
 await caption(
   '8 / 9',
   'Your move, then theirs',
@@ -536,6 +566,7 @@ const one = await sim(() => {
 });
 await fly({ x: one.x, z: one.z, dist: 18, yaw: 0 });
 await hold(0.8);
+await say('details');
 await caption(
   '9 / 9',
   'Keep an eye on things',
@@ -550,6 +581,7 @@ p = await project(now1.x, now1.z, 0.5);
 await clickAt(p.x, p.y, 'left', 0.8);
 await hold(4.0);
 await hideCaption();
+await say('pause');
 await caption('9 / 9', 'Take a breather', 'Press <kbd>P</kbd> or the <b>❚❚</b> button to pause at any time. <kbd>?</kbd> shows every control.');
 await moveTo(1237, 93, 0.8);
 await hold(0.2);
@@ -577,7 +609,9 @@ await sim((c) => {
   s.issue({ kind: 'attack', side: 'sun', ids: us.map((u) => u.id), target: { kind: 'building', id: c.id } });
 }, W0.moonCastle);
 await page.evaluate((c) => window.__crCam.jump({ x: c.x - 2, z: c.z, dist: 24, yaw: 0 }), W0.moonCastle);
+await say('later');
 await card(`<div><div class="kick">Later in the battle</div><h2>The Sun storms Nocturne</h2></div>`, 1.4, 0.4, 0.5);
+await say('victory');
 await caption('', 'Victory', 'Bring down <b>Nocturne Castle</b>, or checkmate the Moon, to win. The <b>battle report</b> shows how the fight went.');
 await until(() => !!window.__crGame.sim.winner, 20);
 await until(() => !!document.querySelector('.summary-kicker'), 8);
@@ -585,6 +619,7 @@ await hideCaption();
 await hold(3.6);
 
 // Tips and outro.
+await say('tips');
 await card(
   `<div><h2>Tips for your first battle</h2>
    <ul>
@@ -597,7 +632,9 @@ await card(
   0.6,
   0.6,
 );
+await say('outro');
 await card(`<div><div class="kick">Now take the field</div><h1>Chess Realms</h1><div class="rule"></div><p>Sun against Moon. Board against battlefield.</p></div>`, 3.0, 0.6, 0.8);
 
+fs.writeFileSync(path.join(OUT, 'cues.json'), JSON.stringify(cues, null, 1));
 console.log(`done: ${n} frames, ${(n / FPS).toFixed(1)} s, ${((Date.now() - t0) / 60000).toFixed(1)} min`);
 await browser.close();
