@@ -20,8 +20,9 @@ import { cam, flyTo, HOME_POSE, OVERVIEW_POSE } from './camera';
 import { clampPose, eye, panScreen, rayGround, step, zoomAt, type CamPose } from './rts';
 import { pick, realm, buildingById, cellByKey, nearestPlace, TERRAIN_LABEL } from '../game';
 import { useUi } from '../state/ui';
-import { game, orderMove, orderStop, ownUnits, pickUnit, renderPos, PLAYER, describeUnits, ownSelected } from '../sim/runner';
+import { game, orderMove, orderAttack, orderStop, ownUnits, pickUnit, renderPos, PLAYER, describeUnits, ownSelected, visibleToPlayer } from '../sim/runner';
 import { box } from '../hud/BoxSelect';
+import { setPaused } from '../hud/Menus';
 
 const CLICK_PX = 6;
 
@@ -97,13 +98,16 @@ export function CameraRig() {
   const intro = useRef(true);
   const lastClick = useRef(0);
   const lastGroup = useRef({ n: 0, t: 0 });
+  const lastClickUnit = useRef<number | null>(null);
   const ray = useRef(new THREE.Raycaster());
   const ndc = useRef(new THREE.Vector2());
   const sharp = useRef(2.2);
 
   // Fly from the overview down to Sunspire once on load.
   useEffect(() => {
-    const id = setTimeout(() => flyTo(HOME_POSE), 700);
+    const id = setTimeout(() => {
+      if (useUi.getState().screen !== 'title') flyTo(HOME_POSE);
+    }, 700);
     return () => clearTimeout(id);
   }, []);
 
@@ -140,6 +144,8 @@ export function CameraRig() {
     };
 
     const onDown = (e: PointerEvent) => {
+      const st = useUi.getState();
+      if (st.screen === 'title' || st.paused) return;
       userInput();
       el.setPointerCapture(e.pointerId);
       pointers.current.set(e.pointerId, { x: e.clientX, y: e.clientY, button: e.button, shift: e.shiftKey });
@@ -242,9 +248,43 @@ export function CameraRig() {
       if (inside.length) ui.addLog(`Selected ${describeUnits(ids)}`, 'sun');
     };
 
+    /** An enemy soldier or standing enemy building under the pointer, if any. */
+    const enemyAt = (cx: number, cy: number): import('@cr/game-core').TargetRef | null => {
+      const r = rayFrom(cx, cy);
+      const uid = pickUnit(r.origin, r.direction);
+      if (uid !== null) {
+        const u = game.sim.unit(uid)!;
+        return u.side !== PLAYER && visibleToPlayer(u) ? { kind: 'unit', id: uid } : null;
+      }
+      const p = pick(r.origin, r.direction);
+      if (p?.kind === 'building') {
+        const b = game.sim.building(p.id);
+        if (b && !b.destroyed && b.side !== PLAYER && b.side !== 'neutral') return { kind: 'building', id: b.id };
+      }
+      return null;
+    };
+
+    /** Order selected soldiers at a screen point: attack what's there, or move (or attack-move). */
+    const orderAt = (cx: number, cy: number, attackMove: boolean): boolean => {
+      if (!ownSelected().length) return false;
+      const t = enemyAt(cx, cy);
+      if (t) return orderAttack(t);
+      const g = groundAt(cx, cy);
+      return !!g && orderMove(g.x, g.z, attackMove);
+    };
+
     /** Left click / tap: select a unit, or (touch, with your units selected) order them, or inspect. */
     const click = (cx: number, cy: number, shift: boolean, touch: boolean) => {
       const ui = useUi.getState();
+      if (ui.attackMode) {
+        ui.setAttackMode(false);
+        if (orderAt(cx, cy, true)) return;
+      }
+      // Touch with your soldiers selected: tapping an enemy attacks it.
+      if (touch && ownSelected().length) {
+        const t = enemyAt(cx, cy);
+        if (t && orderAttack(t)) return;
+      }
       const r = rayFrom(cx, cy);
       const unitId = pickUnit(r.origin, r.direction);
       const now = performance.now();
@@ -252,6 +292,7 @@ export function CameraRig() {
       lastClick.current = now;
       if (unitId !== null) {
         const u = game.sim.unit(unitId)!;
+        lastClickUnit.current = unitId;
         if (double && u.side === PLAYER) {
           // Double-click: everyone of that type in view.
           const ids = ownUnits(u.type)
@@ -315,10 +356,12 @@ export function CameraRig() {
       box.active = false;
       if (d.moved || !quick) return;
       if (d.button === 2) {
-        // Right-click: move order for your selected units.
-        const g = groundAt(e.clientX, e.clientY);
-        if (g && !orderMove(g.x, g.z) && useUi.getState().selectedUnits.length) {
-          useUi.getState().addLog('Those are Moon soldiers: you can inspect them but not command them', 'system');
+        // Right-click: attack the enemy under the pointer, or move there.
+        const ui = useUi.getState();
+        const attackMove = ui.attackMode;
+        ui.setAttackMode(false);
+        if (!orderAt(e.clientX, e.clientY, attackMove) && ui.selectedUnits.length) {
+          ui.addLog('Those are Moon soldiers: you can inspect them but not command them', 'system');
         }
         return;
       }
@@ -352,8 +395,18 @@ export function CameraRig() {
       if (k === 'o') { userInput(); flyTo(OVERVIEW_POSE); ui.addLog('Strategic overview', 'system'); }
       if (k === 'n') { userInput(); flyTo({ yaw: Math.round(cam.goal.yaw / (Math.PI * 2)) * Math.PI * 2 }); }
       if (k === 'f') { userInput(); if (focusPick()) ui.addLog(ui.selectedUnits.length ? 'Camera focused on the selection' : `Camera focused on ${describePick(ui.selected)}`, 'system'); }
-      if (k === 'escape') { ui.select(null); ui.selectUnits([]); if (ui.showHelp) ui.toggle('showHelp'); }
+      if (k === 'escape') {
+        if (ui.showHelp) ui.toggle('showHelp');
+        else if (ui.showSettings) ui.toggle('showSettings');
+        else if (ui.attackMode) ui.setAttackMode(false);
+        else if (ui.selected || ui.selectedUnits.length) { ui.select(null); ui.selectUnits([]); }
+        else if (ui.screen === 'playing' && !ui.result) setPaused(!ui.paused);
+      }
+      if (k === 'p' && ui.screen === 'playing' && !ui.result) setPaused(!ui.paused);
+      if (k === 'b' && ui.screen === 'playing') ui.toggle('showWarTable');
       if (k === 'x') { if (orderStop()) e.preventDefault(); }
+      if (k === 't' && ownSelected().length) { ui.setAttackMode(!ui.attackMode); }
+      if (k === 'escape' && ui.attackMode) ui.setAttackMode(false);
       if (k === 'a' && (e.ctrlKey || e.metaKey)) {
         e.preventDefault();
         const ids = ownUnits().map((u) => u.id);
@@ -497,8 +550,12 @@ export function CameraRig() {
       ui.hoverUnit(uid);
       const p = uid === null ? pick(ray.current.ray.origin, ray.current.ray.direction) : null;
       ui.hover(p);
+      const enemyUnder = (uid !== null && game.sim.unit(uid)?.side !== PLAYER) || (p?.kind === 'building' && game.sim.building(p.id)?.side === 'moon' && !game.sim.building(p.id)?.destroyed);
+      const armed = ownSelected().length > 0;
       gl.domElement.style.cursor =
-        uid !== null || p?.kind === 'building' ? 'pointer' : drag.current.mode === 'pan' ? 'grabbing' : ownSelected().length ? 'crosshair' : 'default';
+        armed && (enemyUnder || ui.attackMode)
+          ? `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24'%3E%3Cpath d='M4 20 L18 6 M14 4 L20 4 L20 10 M4 16 L8 20' stroke='%23F0604F' stroke-width='2.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E") 4 20, crosshair`
+          : uid !== null || p?.kind === 'building' ? 'pointer' : drag.current.mode === 'pan' ? 'grabbing' : armed ? 'crosshair' : 'default';
     }
   });
 

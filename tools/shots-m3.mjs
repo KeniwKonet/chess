@@ -1,0 +1,26 @@
+import { chromium } from '@playwright/test';
+const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium', args: ['--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist'] });
+const page = await b.newPage({ viewport: { width: 1440, height: 900 } });
+await page.goto('http://localhost:4174/');
+await page.waitForSelector('body[data-ready="1"]');
+await page.waitForTimeout(2500);
+await page.screenshot({ path: 'docs/img/m4-title.png' });
+await page.evaluate(() => window.__crStart('warlord'));
+await page.evaluate(() => { const g = window.__crGame; for (let i = 0; i < 1350; i++) g.match.step(); });
+// Find the biggest fight and look at it.
+const c = await page.evaluate(() => { const us = window.__crGame.sim.units.filter((u) => u.state === 'attacking'); if (!us.length) return { x: 32, z: 18 }; return { x: us.reduce((a, u) => a + u.x, 0) / us.length, z: us.reduce((a, u) => a + u.z, 0) / us.length }; });
+await page.evaluate((c) => window.__crCam.jump({ x: c.x, z: c.z, dist: 18, yaw: 0.3 }), c);
+await page.waitForTimeout(3000);
+await page.screenshot({ path: 'docs/img/m3-battle.png' });
+await page.evaluate(() => window.__crCam.jump({ x: 32, z: 19, dist: 80, yaw: 0 }));
+await page.waitForTimeout(2500);
+await page.screenshot({ path: 'docs/img/m3-fog.png' });
+await page.keyboard.press('b');
+await page.waitForTimeout(800);
+await page.screenshot({ path: 'docs/img/m5-wartable.png' });
+await page.keyboard.press('b');
+await page.evaluate(() => window.__crGame.sim.declareWinner('sun', 'Nocturne Castle has fallen'));
+await page.waitForSelector('.summary-kicker', { timeout: 30000 });
+await page.waitForTimeout(600);
+await page.screenshot({ path: 'docs/img/m4-summary.png' });
+await b.close();

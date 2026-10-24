@@ -5,6 +5,7 @@
  */
 import * as THREE from 'three';
 import type { GLTF } from 'three/examples/jsm/loaders/GLTFLoader.js';
+import { withFog } from '../world/fog';
 
 export interface KitPart {
   name: string;
@@ -83,6 +84,8 @@ export function buildKit(gltf: GLTF): Kit {
   };
   foliage.customProgramCacheKey = () => 'foliage-wind';
 
+  withFog(material);
+  withFog(foliage);
   return { parts, roots, material, foliage, has: (m) => parts.has(m) };
 }
 

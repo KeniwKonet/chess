@@ -2,7 +2,8 @@ import { Component, Suspense, useEffect, type ReactNode } from 'react';
 import { Canvas } from '@react-three/fiber';
 import * as THREE from 'three';
 import { useUi } from './state/ui';
-import { World, Lighting, WindClock } from './world/World';
+import { World, Lighting, WindClock, FogUpdater } from './world/World';
+import { Menus } from './hud/Menus';
 import { Sea } from './world/Sea';
 import { SelectionMarkers, CaptureRings } from './world/Markers';
 import { FallbackWorld } from './world/FallbackWorld';
@@ -35,6 +36,7 @@ class AssetBoundary extends Component<{ children: ReactNode; fallback: ReactNode
 function Ready() {
   useEffect(() => {
     document.body.dataset.ready = '1';
+    useUi.setState({ loaded: true });
     useUi.getState().addLog('Battlefield loaded: the Ashen Divide', 'system');
   }, []);
   return null;
@@ -74,6 +76,7 @@ export function App() {
         </AssetBoundary>
         <UnitMarks />
         <SimDriver />
+        <FogUpdater />
         <CaptureRings />
         <SelectionMarkers />
         <WindClock />
@@ -84,14 +87,15 @@ export function App() {
       <Overlay />
       <BoxSelect />
       <Hud />
+      <Menus />
       <Loading failed={failed} />
     </div>
   );
 }
 
 function Loading({ failed }: { failed: boolean }) {
-  const log = useUi((s) => s.log);
-  const ready = log.some((l) => l.text.startsWith('Battlefield loaded')) || failed;
+  const loaded = useUi((s) => s.loaded);
+  const ready = loaded || failed;
   return (
     <div className={`loading${ready ? ' done' : ''}`} aria-hidden={ready}>
       <div className="loading-mark">♜</div>
