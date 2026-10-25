@@ -189,8 +189,10 @@ for (const d of DEVICES) {
     r.notes.push(`war table: ${e.message}`);
   }
 
-  // Tap a single soldier.
+  // Tap a single soldier (closing the soldiers panel first, as a player would).
   try {
+    const closeSel = page.locator('.selection button[aria-label="Close"]');
+    if (await closeSel.count()) await tapEl(closeSel.first());
     const p = await page.evaluate(() => {
       const u = window.__crGame.sim.units.find((u) => u.side === 'sun' && u.type === 'archer');
       window.__crCam.jump({ x: u.x, z: u.z, dist: 14 });

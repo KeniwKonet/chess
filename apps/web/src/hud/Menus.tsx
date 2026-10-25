@@ -22,7 +22,13 @@ export function startMatch(d: Difficulty) {
   ui.setPaused(false);
   useUi.setState({ result: null, showWarTable: false });
   game.paused = false;
-  flyTo(homePose());
+  // Portrait phones open close to the army, so frame it rather than the castle.
+  const home = homePose();
+  const us = game.sim.units.filter((u) => u.side === PLAYER);
+  const portrait = window.innerHeight > window.innerWidth * 1.15;
+  if (portrait && us.length) {
+    flyTo({ ...home, x: us.reduce((a, u) => a + u.x, 0) / us.length - 1, z: us.reduce((a, u) => a + u.z, 0) / us.length });
+  } else flyTo(home);
 }
 
 export function setPaused(p: boolean) {

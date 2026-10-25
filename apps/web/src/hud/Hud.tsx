@@ -225,7 +225,7 @@ function Help() {
     ['♛ War Table', 'Chess that commands the battle. Tap a piece, then where it goes'],
     ['Drag · pinch · twist', 'Pan · zoom · rotate the view'],
     ['Minimap', 'Tap to jump the camera there'],
-    ['Tap a building or tile', 'Inspect it'],
+    ['Tap a building or tile', 'Inspect it (close the soldiers panel first)'],
     ['❚❚', 'Pause'],
   ];
   const deskRows: [string, string][] = [

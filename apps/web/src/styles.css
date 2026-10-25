@@ -399,7 +399,9 @@ button { font: inherit; color: inherit; }
   .log { top: 64px; max-height: calc(100dvh - 74px); }
   .perf { top: 64px; }
   .minimap canvas { width: 112px !important; }
-  .selection { left: auto; right: var(--gutter); transform: none; bottom: var(--gutter); width: min(360px, 46vw); padding: 8px 12px; }
+  .selection { left: var(--gutter); right: auto; transform: none; bottom: var(--gutter); width: min(360px, 46vw); padding: 8px 12px; }
+  body:has(.selection) .bottom-left { display: none; }
+  .log { width: min(280px, 34vw); }
   .selection .sel-foot, .selection .sel-text { display: none; }
   .selection h2 { font-size: 19px; }
   .roster { margin-top: 6px; }
