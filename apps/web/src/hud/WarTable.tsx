@@ -4,7 +4,7 @@
  * (docs/RULES.md). You play the Sun (white); the Moon replies after thinking.
  */
 import { useEffect, useMemo, useReducer, useState } from 'react';
-import { useUi } from '../state/ui';
+import { useUi, IS_MOBILE } from '../state/ui';
 import { game, playChess, describeEffect, describeUnits, PLAYER } from '../sim/runner';
 import { BOND_RULES } from '@cr/match';
 

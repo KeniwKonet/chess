@@ -5,9 +5,9 @@
  */
 import { useEffect, useState } from 'react';
 import { DIFFICULTY, type Difficulty } from '@cr/game-core';
-import { useUi, type Quality } from '../state/ui';
+import { useUi, IS_MOBILE, type Quality } from '../state/ui';
 import { game, newMatch, PLAYER, onlineServer, connectRemote } from '../sim/runner';
-import { flyTo, HOME_POSE, OVERVIEW_POSE } from '../camera/camera';
+import { flyTo, homePose, OVERVIEW_POSE } from '../camera/camera';
 
 const clock = (ticks: number) => {
   const s = Math.floor(ticks / 10);
@@ -22,7 +22,7 @@ export function startMatch(d: Difficulty) {
   ui.setPaused(false);
   useUi.setState({ result: null, showWarTable: false });
   game.paused = false;
-  flyTo(HOME_POSE);
+  flyTo(homePose());
 }
 
 export function setPaused(p: boolean) {
@@ -219,10 +219,12 @@ function Settings() {
           <span>Map labels</span>
           <button className={`btn${showLabels ? ' on' : ''}`} aria-pressed={showLabels} onClick={() => toggle('showLabels')}>{showLabels ? 'On' : 'Off'}</button>
         </div>
-        <div className="setting">
-          <span>Edge panning</span>
-          <button className={`btn${edgeScroll ? ' on' : ''}`} aria-pressed={edgeScroll} onClick={() => toggle('edgeScroll')}>{edgeScroll ? 'On' : 'Off'}</button>
-        </div>
+        {!IS_MOBILE && (
+          <div className="setting">
+            <span>Edge panning</span>
+            <button className={`btn${edgeScroll ? ' on' : ''}`} aria-pressed={edgeScroll} onClick={() => toggle('edgeScroll')}>{edgeScroll ? 'On' : 'Off'}</button>
+          </div>
+        )}
       </section>
     </div>
   );

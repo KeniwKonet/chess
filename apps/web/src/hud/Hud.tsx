@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { STARTING_RESOURCES, moveCost } from '@cr/game-core';
-import { useUi } from '../state/ui';
+import { useUi, IS_MOBILE } from '../state/ui';
 import { buildingById, cellByKey, nearestPlace, realm, TERRAIN_LABEL, TYPE_LABEL } from '../game';
 import { cam, flyTo, HOME_POSE, OVERVIEW_POSE } from '../camera/camera';
 import { zoomAt, clampPose } from '../camera/rts';
@@ -78,11 +78,14 @@ function Toolbar() {
   const { showLabels, toggle, showPerf, addLog } = useUi();
   return (
     <div className="toolbar panel" role="toolbar" aria-label="View controls">
-      <button className="btn" onClick={() => { flyTo(OVERVIEW_POSE); addLog('Strategic overview', 'system'); }} title="Strategic overview (O)">Overview</button>
-      <button className="btn" onClick={() => { flyTo(HOME_POSE); addLog('Camera returned to Sunspire', 'system'); }} title="Return to Sunspire (H)">Sunspire</button>
-      <button className={`btn${showLabels ? ' on' : ''}`} aria-pressed={showLabels} onClick={() => toggle('showLabels')} title="Map labels (L)">Labels</button>
+      <button className="btn" onClick={() => { flyTo(OVERVIEW_POSE); addLog('Strategic overview', 'system'); }} title="Strategic overview (O)" aria-label="Overview">
+        <span className="long">Overview</span>
+        <span className="short">Map</span>
+      </button>
+      <button className="btn desk-only" onClick={() => { flyTo(HOME_POSE); addLog('Camera returned to Sunspire', 'system'); }} title="Return to Sunspire (H)">Sunspire</button>
+      <button className={`btn desk-only${showLabels ? ' on' : ''}`} aria-pressed={showLabels} onClick={() => toggle('showLabels')} title="Map labels (L)">Labels</button>
       <WarTableButton />
-      <button className={`btn${showPerf ? ' on' : ''}`} aria-pressed={showPerf} onClick={() => toggle('showPerf')} title="Performance stats (`)">Stats</button>
+      <button className={`btn desk-only${showPerf ? ' on' : ''}`} aria-pressed={showPerf} onClick={() => toggle('showPerf')} title="Performance stats (`)">Stats</button>
       <button className="btn" onClick={() => toggle('showHelp')} title="Controls (?)" aria-label="How to play">?</button>
       <button className="btn" onClick={() => toggle('showSettings')} title="Settings" aria-label="Settings">⚙</button>
       <button className="btn" onClick={() => setPaused(true)} title="Pause (P)" aria-label="Pause">❚❚</button>
@@ -213,7 +216,19 @@ function Help() {
   const toggle = useUi((s) => s.toggle);
   const edgeScroll = useUi((s) => s.edgeScroll);
   if (!show) return null;
-  const rows: [string, string][] = [
+  const touchRows: [string, string][] = [
+    ['Army buttons (top left)', 'Select your infantry, your archers, or everyone'],
+    ['Tap a soldier', 'Select just that soldier'],
+    ['Tap the ground', 'Move the selected soldiers there. They find their own way'],
+    ['Tap an enemy', 'Attack it with the selected soldiers'],
+    ['Attack-move, then tap', 'Advance and fight anything met on the way'],
+    ['♛ War Table', 'Chess that commands the battle. Tap a piece, then where it goes'],
+    ['Drag · pinch · twist', 'Pan · zoom · rotate the view'],
+    ['Minimap', 'Tap to jump the camera there'],
+    ['Tap a building or tile', 'Inspect it'],
+    ['❚❚', 'Pause'],
+  ];
+  const deskRows: [string, string][] = [
     ['Click a soldier', 'Select it. Shift-click adds or removes'],
     ['Left-drag', 'Box-select your soldiers (Shift adds)'],
     ['Double-click a soldier', 'Select all of that type in view'],
@@ -232,6 +247,7 @@ function Help() {
     ['F · H · O · N', 'Focus selection · Sunspire · overview · face north'],
     ['L · ` · Esc', 'Labels · stats · clear selection'],
   ];
+  const rows = IS_MOBILE ? touchRows : deskRows;
   return (
     <div className="modal-scrim" onClick={() => toggle('showHelp')}>
       <section className="help panel" role="dialog" aria-modal="true" aria-label="Controls" onClick={(e) => e.stopPropagation()}>
@@ -247,11 +263,13 @@ function Help() {
             </div>
           ))}
         </dl>
-        <div className="help-settings">
-          <button className={`btn${edgeScroll ? ' on' : ''}`} aria-pressed={edgeScroll} onClick={() => toggle('edgeScroll')}>
-            Edge panning {edgeScroll ? 'on' : 'off'}
-          </button>
-        </div>
+        {!IS_MOBILE && (
+          <div className="help-settings">
+            <button className={`btn${edgeScroll ? ' on' : ''}`} aria-pressed={edgeScroll} onClick={() => toggle('edgeScroll')}>
+              Edge panning {edgeScroll ? 'on' : 'off'}
+            </button>
+          </div>
+        )}
         <p className="sel-foot">
           Win by destroying Nocturne Castle or by checkmate on the War Table; lose if Sunspire falls. Idle soldiers defend themselves; capture rings change hands when only one side stands in them; barracks and ranges send reinforcements every 90 seconds while they stand. Zoomed far out, soldiers show as chess pieces: pawns are infantry, bishops are archers.
         </p>
@@ -294,7 +312,7 @@ function WarTableButton() {
   const yourMove = wt.turn === PLAYER && !wt.over;
   return (
     <button className={`btn${show ? ' on' : ''}${yourMove && !show ? ' nudge' : ''}`} aria-pressed={show} onClick={() => toggle('showWarTable')} title="The War Table: chess that commands the battle (B)">
-      ♛ War Table{yourMove && !show ? <small>Your move</small> : null}
+      ♛ War Table{yourMove && !show ? <small aria-label="Your move">Your move</small> : null}
     </button>
   );
 }

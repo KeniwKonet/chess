@@ -19,6 +19,7 @@ const DEVICES = [
   { name: 'pixel-7', w: 412, h: 915, dpr: 2.625 },
   { name: 'phone-landscape', w: 844, h: 390, dpr: 3 },
   { name: 'ipad-mini', w: 768, h: 1024, dpr: 2 },
+  { name: 'ipad-landscape', w: 1024, h: 768, dpr: 2 },
 ].filter((d) => !ONLY || ONLY.split(',').includes(d.name));
 
 /** Layout checks run in the page. */
@@ -160,8 +161,9 @@ for (const d of DEVICES) {
     await page.waitForTimeout(800);
     r.chessMoved = await page.evaluate(() => document.querySelectorAll('.wt-log li').length);
     await shot('6-wartable-moved');
-    const close = page.locator('.wartable button[aria-label="Close"]');
-    if (await close.count()) await tapEl(close.first());
+    await tapEl(page.getByRole('button', { name: 'Close the War Table' }));
+    await page.waitForTimeout(400);
+    if (await page.locator('.wartable').count()) r.notes.push('War Table did not close');
   } catch (e) {
     r.notes.push(`war table: ${e.message}`);
   }
