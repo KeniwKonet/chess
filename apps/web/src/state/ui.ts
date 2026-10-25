@@ -62,7 +62,8 @@ interface UiState {
 const isMobile = typeof window !== 'undefined' && (window.matchMedia?.('(pointer: coarse)').matches || window.innerWidth < 760);
 
 let nextId = 1;
-const start = typeof performance !== 'undefined' ? performance.now() : 0;
+/** Field-log clock origin; reset when a new battle clears the log, so times count from the battle's start. */
+let start = typeof performance !== 'undefined' ? performance.now() : 0;
 const same = (a: Pick, b: Pick) =>
   a === b || (!!a && !!b && a.kind === b.kind && (a.kind === 'building' ? a.id === (b as typeof a).id : a.key === (b as { key: string }).key));
 
@@ -80,7 +81,10 @@ export const useUi = create<UiState>((set) => ({
   setDifficulty: (difficulty) => set({ difficulty }),
   endMatch: (winner, reason) => set({ result: { winner, reason, at: performance.now() } }),
   setAttackMode: (attackMode) => set({ attackMode }),
-  clearLog: () => set({ log: [] }),
+  clearLog: () => {
+    start = typeof performance !== 'undefined' ? performance.now() : 0;
+    set({ log: [] });
+  },
   selected: null,
   hovered: null,
   quality: isMobile ? 'medium' : 'high',

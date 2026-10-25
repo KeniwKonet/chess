@@ -8,6 +8,10 @@ test.beforeEach(async ({ page }) => {
   const errors: string[] = [];
   page.on('pageerror', (e) => errors.push(e.message));
   (page as unknown as { errors: string[] }).errors = errors;
+  // WebGL shader failures don't throw: a failed program just draws nothing, so watch the console.
+  const gl: string[] = [];
+  page.on('console', (m) => /Shader Error|program not valid/.test(m.text()) && gl.push(m.text().slice(0, 200)));
+  (page as unknown as { glErrors: string[] }).glErrors = gl;
   await page.goto('/');
   await page.waitForSelector('body[data-ready="1"]', { timeout: 60_000 });
   // Skip the title screen.
@@ -89,6 +93,15 @@ test('graphics quality switches and reduces draw calls on Low', async ({ page })
   // Low drops the shadow pass, so each frame needs fewer draw calls.
   await expect.poll(calls, { timeout: 30_000 }).toBeLessThan(high);
   expect(await calls()).toBeGreaterThan(20);
+  // Switching remounts the canvas and sets the shared materials up again; they must still compile.
+  await page.getByRole('button', { name: 'Settings' }).click();
+  await page.getByRole('button', { name: 'High', exact: true }).click();
+  await page.getByRole('button', { name: 'Close' }).click();
+  await page.waitForTimeout(1500);
+  await jump(page, { x: 32, z: 19, dist: 60, yaw: 0 });
+  // Back on High at the same view, the full scene draws again (shadow pass included).
+  await expect.poll(calls, { timeout: 30_000 }).toBeGreaterThan(high * 0.8);
+  expect((page as unknown as { glErrors: string[] }).glErrors).toEqual([]);
 
 });
 
@@ -194,6 +207,35 @@ test.describe('battle, War Table and match flow', () => {
     await page.mouse.click(pt.x, pt.y, { button: 'right' });
     await expect(page.locator('.log')).toContainText('attacking', { timeout: 15_000 });
     await expect.poll(async () => (await page.evaluate((id) => (window.__crGame! as unknown as { sim: { unit: (i: number) => { hp: number } | undefined } }).sim.unit(id)?.hp ?? 0, ids.foe)), { timeout: 30_000 }).toBeLessThan(100);
+  });
+
+  test('a destroyed building turns to rubble and every material still compiles', async ({ page }) => {
+    await jump(page, { x: 12, z: 17, dist: 22, yaw: 0 });
+    await page.evaluate(() => {
+      const g = window.__crGame! as unknown as { sim: { buildings: { id: string; hp: number; side: string; type: string }[] }; match: { step: () => unknown } };
+      const t = g.sim.buildings.find((b) => b.side === 'sun' && b.type === 'tower')!;
+      t.hp = 0.01;
+      (window as unknown as { __crTarget: string }).__crTarget = t.id;
+    });
+    // A Moon archer beside it finishes the job through ordinary combat. The order is
+    // repeated while waiting, because the Moon commander may re-task its soldiers.
+    const strike = () =>
+      page.evaluate(() => {
+        const g = window.__crGame! as unknown as { sim: { buildings: { id: string; x: number; z: number; destroyed: boolean }[]; units: { id: number; hp: number; side: string; x: number; z: number; type: string }[]; issue: (c: unknown) => void } };
+        const t = g.sim.buildings.find((b) => b.id === (window as unknown as { __crTarget: string }).__crTarget)!;
+        if (t.destroyed) return true;
+        const foe = g.sim.units.find((u) => u.side === 'moon' && u.type === 'archer' && u.hp > 0)!;
+        if (Math.hypot(foe.x - t.x, foe.z - t.z) > 5) {
+          foe.x = t.x + 3;
+          foe.z = t.z;
+        }
+        g.sim.issue({ kind: 'attack', side: 'moon', ids: [foe.id], target: { kind: 'building', id: t.id } });
+        return false;
+      });
+    await expect.poll(strike, { timeout: 30_000 }).toBe(true);
+    await expect(page.locator('.log')).toContainText('destroyed');
+    await page.waitForTimeout(2000);
+    expect((page as unknown as { glErrors: string[] }).glErrors).toEqual([]);
   });
 
   test('pause and resume', async ({ page }) => {
