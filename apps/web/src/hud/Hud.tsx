@@ -186,7 +186,8 @@ function SelectionPanel() {
 
 function FieldLog() {
   const log = useUi((s) => s.log);
-  const [open, setOpen] = useState(typeof window === 'undefined' || window.innerWidth > 760);
+  // Starts folded on phones (portrait or sideways) and small tablets, where it would cover the battlefield.
+  const [open, setOpen] = useState(typeof window === 'undefined' || (window.innerWidth > 900 && window.innerHeight > 500));
   return (
     <section className={`log panel${open ? '' : ' closed'}`} aria-label="Field log">
       <button className="log-head" onClick={() => setOpen(!open)} aria-expanded={open}>
