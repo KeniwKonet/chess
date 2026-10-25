@@ -373,6 +373,20 @@ button { font: inherit; color: inherit; }
   .toolbar .btn { min-width: 42px; }
   .compass { width: 40px; height: 40px; }
 }
+/* Portrait phones: a selection docks at the bottom in place of the minimap, leaving the middle of the map free to tap. */
+@media (max-width: 900px) and (min-height: 501px) {
+  .selection { bottom: var(--gutter); }
+  body:has(.selection) .bottom-left { display: none; }
+  .selection .sel-foot { display: none; }
+  .sel-actions { flex-wrap: nowrap; overflow-x: auto; }
+  .sel-actions .btn { flex: none; }
+}
+@media (pointer: coarse) {
+  .army .btn { min-width: 44px; }
+  .roster-chip { width: 40px; height: 42px; }
+  .log-head { min-height: 40px; }
+  .wt-legend summary { padding: 10px 0; }
+}
 @media (max-width: 480px) {
   .toolbar { justify-content: space-between; gap: 4px; }
   .toolbar .btn { padding-left: 9px; padding-right: 9px; }
@@ -400,4 +414,8 @@ button { font: inherit; color: inherit; }
   .stats th, .stats td { padding: 3px 6px; }
   .menu-actions { margin-top: 10px; }
   .title-text { display: none; }
+}
+
+@media (min-width: 901px) and (max-width: 1180px) and (min-height: 501px) {
+  .selection { left: var(--gutter); transform: none; bottom: calc(var(--gutter) + 200px); }
 }

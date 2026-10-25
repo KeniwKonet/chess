@@ -116,7 +116,10 @@ for (const d of DEVICES) {
     await page.evaluate(() => window.__crStart('recruit'));
   }
   await page.waitForSelector('body[data-units="1"]', { timeout: 60_000 }).catch(() => r.notes.push('units never ready'));
-  await page.waitForTimeout(2500);
+  // Software WebGL renders a few frames a second, so the opening fly-in crawls; settle it as a phone would.
+  r.startView = await page.evaluate(() => ({ ...window.__crCam.cam.goal }));
+  await page.evaluate(() => window.__crCam.jump({ ...window.__crCam.cam.goal }));
+  await page.waitForTimeout(1500);
   await shot('2-battle');
 
   // Toolbar: which buttons are on screen without scrolling?
@@ -138,9 +141,27 @@ for (const d of DEVICES) {
       const z = us.reduce((a, u) => a + u.z, 0) / us.length;
       return window.__crProject(x, 0, z);
     });
-    const inView = p.x > 0 && p.x < d.w && p.y > 0 && p.y < d.h;
-    if (!inView) r.notes.push('march target off screen in default view');
-    await page.touchscreen.tap(Math.min(Math.max(p.x, 20), d.w - 20), Math.min(Math.max(p.y, 20), d.h - 20));
+    // Tap open ground the way a player would: beside the company, but never on a HUD panel.
+    const covered = await page.evaluate(([x, y]) => {
+      const el = document.elementFromPoint(x, y);
+      return !!el && el.tagName !== 'CANVAS';
+    }, [p.x, p.y]);
+    const inView = p.x > 20 && p.x < d.w - 20 && p.y > 20 && p.y < d.h - 20;
+    let tx = p.x;
+    let ty = p.y;
+    if (!inView || covered) {
+      r.notes.push(`march: spot beside the company is ${inView ? 'under a panel' : 'off screen'}; tapped open ground instead`);
+      const open = await page.evaluate(() => {
+        for (const fy of [0.45, 0.4, 0.5, 0.35, 0.55, 0.3]) for (const fx of [0.6, 0.5, 0.7, 0.4]) {
+          const x = innerWidth * fx, y = innerHeight * fy;
+          const el = document.elementFromPoint(x, y);
+          if (el && el.tagName === 'CANVAS') return { x, y };
+        }
+        return null;
+      });
+      if (open) ({ x: tx, y: ty } = open);
+    }
+    await page.touchscreen.tap(tx, ty);
     await page.waitForTimeout(1500);
     r.marching = await page.evaluate(() => window.__crGame.sim.units.filter((u) => u.side === 'sun' && u.type === 'infantry' && u.state === 'moving').length);
     await shot('4-march');
