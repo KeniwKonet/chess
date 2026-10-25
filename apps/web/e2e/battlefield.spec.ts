@@ -257,3 +257,44 @@ test.describe('battle, War Table and match flow', () => {
     expect(await page.evaluate(() => window.__crGame!.sim.tick)).toBeLessThan(50);
   });
 });
+
+/** Every visible control inside the screen (no hidden scrolling toolbar, no unreachable squares). */
+const offScreen = (page: Page) =>
+  page.evaluate(() =>
+    [...document.querySelectorAll('button')]
+      .filter((b) => {
+        const r = b.getBoundingClientRect();
+        const s = getComputedStyle(b);
+        return r.width > 0 && s.visibility !== 'hidden' && (r.right > innerWidth + 1 || r.left < -1 || r.bottom > innerHeight + 1 || r.top < -1);
+      })
+      .map((b) => (b.getAttribute('aria-label') || b.textContent || '').trim()),
+  );
+
+test.describe('phone portrait', () => {
+  test.use({ viewport: { width: 360, height: 800 }, hasTouch: true, isMobile: true });
+  test('the whole toolbar fits; War Table, help and pause open by tap', async ({ page }) => {
+    await page.waitForSelector('body[data-units="1"]', { timeout: 60_000 });
+    expect(await offScreen(page)).toEqual([]);
+    for (const name of [/War Table/, 'How to play', 'Settings', 'Pause']) await expect(page.locator('.toolbar').getByRole('button', { name })).toBeInViewport();
+    await page.locator('.toolbar').getByRole('button', { name: /War Table/ }).tap();
+    await expect(page.locator('.wartable')).toBeVisible();
+    await expect(page.locator('.wt-hover')).toContainText('Tap one of your pieces');
+    expect(await offScreen(page)).toEqual([]);
+    await page.locator('button[aria-label^="e2"]').tap();
+    await expect(page.locator('.wt-hover')).toContainText('Commands');
+  });
+});
+
+test.describe('phone landscape', () => {
+  test.use({ viewport: { width: 844, height: 390 }, hasTouch: true, isMobile: true });
+  test('the War Table board fits the short screen; the field log starts folded', async ({ page }) => {
+    await page.waitForSelector('body[data-units="1"]', { timeout: 60_000 });
+    await expect(page.locator('.log')).toHaveClass(/closed/);
+    await page.locator('.toolbar').getByRole('button', { name: /War Table/ }).tap();
+    await expect(page.locator('.wartable')).toBeVisible();
+    for (const sq of ['a1', 'h1', 'e2', 'a8', 'h8']) await expect(page.locator(`button[aria-label^="${sq}"]`)).toBeInViewport({ ratio: 1 });
+    await page.locator('button[aria-label^="e2"]').tap();
+    await page.locator('button[aria-label^="e4"]').tap();
+    await expect(page.locator('.wt-log li')).toHaveCount(1);
+  });
+});

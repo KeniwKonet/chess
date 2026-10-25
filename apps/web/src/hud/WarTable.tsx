@@ -4,7 +4,7 @@
  * (docs/RULES.md). You play the Sun (white); the Moon replies after thinking.
  */
 import { useEffect, useMemo, useReducer, useState } from 'react';
-import { useUi } from '../state/ui';
+import { useUi, IS_MOBILE } from '../state/ui';
 import { game, playChess, describeEffect, describeUnits, PLAYER } from '../sim/runner';
 import { BOND_RULES } from '@cr/match';
 
@@ -126,7 +126,13 @@ export function WarTable() {
           )}
         </div>
         <div className="wt-side">
-          <p className="wt-hover">{hover && board.get(hover) ? describeBinding(hover) || ' ' : 'Hover a piece to see what it commands.'}</p>
+          <p className="wt-hover">
+            {(() => {
+              const at = hover && board.get(hover) ? hover : sel;
+              if (at && board.get(at)) return describeBinding(at) || '\u00a0';
+              return IS_MOBILE ? 'Tap one of your pieces to see what it commands and where it can go.' : 'Hover a piece to see what it commands.';
+            })()}
+          </p>
           <h3>Recent orders</h3>
           <ol className="wt-log">
             {recent.length === 0 && <li className="log-empty">No moves yet. You play the Sun (white): move first.</li>}

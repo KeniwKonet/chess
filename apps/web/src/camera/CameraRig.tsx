@@ -273,6 +273,24 @@ export function CameraRig() {
       return !!g && orderMove(g.x, g.z, attackMove);
     };
 
+    /** Nearest visible soldier within `px` screen pixels of a point: fingers are wider than pointers. */
+    const nearUnit = (cx: number, cy: number, keep: (u: import('@cr/game-core').Unit) => boolean, px = 26): number | null => {
+      let best: number | null = null;
+      let bd = px * px;
+      for (const u of game.sim.units) {
+        if (u.hp <= 0 || !visibleToPlayer(u) || !keep(u)) continue;
+        const p = renderPos(u);
+        const s = screenOf(p.x, p.z);
+        if (!s.front) continue;
+        const d2 = (s.x - cx) ** 2 + (s.y - cy) ** 2;
+        if (d2 < bd) {
+          bd = d2;
+          best = u.id;
+        }
+      }
+      return best;
+    };
+
     /** Left click / tap: select a unit, or (touch, with your units selected) order them, or inspect. */
     const click = (cx: number, cy: number, shift: boolean, touch: boolean) => {
       const ui = useUi.getState();
@@ -282,11 +300,17 @@ export function CameraRig() {
       }
       // Touch with your soldiers selected: tapping an enemy attacks it.
       if (touch && ownSelected().length) {
-        const t = enemyAt(cx, cy);
+        let t = enemyAt(cx, cy);
+        if (!t) {
+          const id = nearUnit(cx, cy, (u) => u.side !== PLAYER);
+          if (id !== null) t = { kind: 'unit', id };
+        }
         if (t && orderAttack(t)) return;
       }
       const r = rayFrom(cx, cy);
-      const unitId = pickUnit(r.origin, r.direction);
+      let unitId = pickUnit(r.origin, r.direction);
+      // A near miss on a soldier still selects it on touch (with soldiers selected, a near miss is a move).
+      if (unitId === null && touch && !ownSelected().length) unitId = nearUnit(cx, cy, () => true);
       const now = performance.now();
       const double = now - lastClick.current < 320;
       lastClick.current = now;
@@ -316,7 +340,9 @@ export function CameraRig() {
         return;
       }
       const p = pick(r.origin, r.direction);
-      if (touch && ownSelected().length && p?.kind !== 'building') {
+      // Touch with soldiers selected: a tap on the ground, a tile or one of your own buildings is a move
+      // (enemy buildings were handled above as attacks). Close the panel first to inspect a building.
+      if (touch && ownSelected().length) {
         const g = groundAt(cx, cy);
         if (g && orderMove(g.x, g.z)) return;
       }

@@ -72,6 +72,7 @@ button { font: inherit; color: inherit; }
 .btn:active:not(:disabled) { transform: translateY(1px); }
 .btn:focus-visible { outline: 2px solid var(--sun); outline-offset: 2px; }
 .btn.on { background: linear-gradient(180deg, #8a6a2c, #5a4218); border-color: var(--sun); color: #fff6df; }
+.btn .short { display: none; }
 .btn.icon { width: 34px; height: 34px; padding: 0; font-size: 18px; line-height: 1; display: grid; place-items: center; }
 .btn-locked, .btn:disabled { opacity: 0.55; cursor: not-allowed; border-style: dashed; }
 .btn small { font-size: 10px; margin-left: 4px; padding: 1px 4px; border-radius: 4px; background: rgba(0, 0, 0, 0.35); color: var(--parchment-dim); }
@@ -163,7 +164,7 @@ button { font: inherit; color: inherit; }
 .log-empty { color: var(--parchment-dim); font-style: italic; }
 
 /* ---------- help + perf ---------- */
-.modal-scrim { position: absolute; inset: 0; background: rgba(8, 6, 4, 0.55); display: grid; place-items: center; padding: var(--gutter); }
+.modal-scrim { position: absolute; inset: 0; z-index: 30; background: rgba(8, 6, 4, 0.55); display: grid; place-items: center; padding: var(--gutter); }
 .help { width: min(520px, 100%); padding: 16px 18px; max-height: 90vh; overflow: auto; }
 .help header { display: flex; justify-content: space-between; align-items: center; }
 .help h2 { font-family: var(--font-display); font-weight: 400; margin: 0; font-size: 22px; }
@@ -224,13 +225,18 @@ button { font: inherit; color: inherit; }
 @media (max-width: 1100px) {
   .res-note { display: none; }
 }
-@media (max-width: 760px) {
+@media (max-width: 900px) {
   :root { --gutter: 10px; }
-  .brand { padding: 6px 10px 6px 8px; }
-  .brand-sub, .brand .chip, .brand-name { display: none; }
-  .brand-mark { font-size: 22px; }
-  .toolbar { top: var(--gutter); left: 62px; right: var(--gutter); max-width: none; flex-wrap: nowrap; justify-content: flex-start; overflow-x: auto; scrollbar-width: none; }
-  .toolbar::-webkit-scrollbar { display: none; }
+  /* The brand chip gives way so every toolbar control fits on screen, no hidden scrolling. */
+  .brand { display: none; }
+  .toolbar { top: var(--gutter); left: var(--gutter); right: var(--gutter); max-width: none; flex-wrap: nowrap; justify-content: flex-end; }
+  .toolbar .desk-only { display: none; }
+  .btn .long { display: none; }
+  .btn .short { display: inline; }
+  /* "Your move" becomes a pulsing dot on the War Table button. */
+  .toolbar .btn.nudge small { font-size: 0; width: 9px; height: 9px; padding: 0; margin-left: 6px; border-radius: 50%; display: inline-block; vertical-align: 1px; }
+  .roster { flex-wrap: nowrap; overflow-x: auto; padding-bottom: 2px; scrollbar-width: thin; }
+  .roster-chip { flex: none; }
   .resources { top: 62px; left: var(--gutter); right: var(--gutter); transform: none; justify-content: space-between; gap: 6px; padding: 6px 10px; }
   .res-label { display: none; }
   .res-val { font-size: 16px; }
@@ -263,7 +269,7 @@ button { font: inherit; color: inherit; }
 .roster-chip.moving::after { content: ''; position: absolute; top: 4px; right: 4px; width: 6px; height: 6px; border-radius: 50%; background: var(--good); }
 .roster-hp { position: absolute; left: 0; bottom: 0; height: 3px; background: var(--good); }
 .perf { top: 128px; }
-@media (max-width: 760px) {
+@media (max-width: 900px) {
   .army { top: 108px; left: var(--gutter); padding: 4px 6px; gap: 4px; }
   .army-label { display: none; }
   .army .btn { padding: 5px 8px; }
@@ -282,7 +288,7 @@ button { font: inherit; color: inherit; }
 /* ---------- menus ---------- */
 .menu-scrim { position: absolute; inset: 0; display: grid; place-items: center; padding: var(--gutter); background: rgba(8, 6, 4, 0.55); z-index: 20; }
 .title-scrim { background: radial-gradient(ellipse at 50% 55%, rgba(8, 6, 4, 0.15), rgba(8, 6, 4, 0.7)); }
-.menu { width: min(460px, 100%); padding: 22px 24px; max-height: calc(100vh - 2 * var(--gutter)); overflow: auto; }
+.menu { width: min(460px, 100%); padding: 22px 24px; max-height: calc(100vh - 2 * var(--gutter)); max-height: calc(100dvh - 2 * var(--gutter)); overflow: auto; }
 .menu h2 { font-family: var(--font-display); font-weight: 400; font-size: 26px; margin: 0; text-wrap: balance; }
 .menu-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
 .menu-sub { color: var(--parchment-dim); margin: 6px 0 0; font-size: 14px; }
@@ -351,10 +357,67 @@ button { font: inherit; color: inherit; }
 .wt-legend dl > div { display: grid; grid-template-columns: 74px 1fr; gap: 8px; }
 .wt-legend dt { font-weight: 600; }
 .wt-legend dd { margin: 0; color: var(--parchment-dim); font-size: 12px; }
-@media (max-width: 760px) {
+@media (max-width: 900px) {
   .wartable { top: 150px; padding: 10px; }
   .wt-body { grid-template-columns: 1fr; }
   .wt-board { grid-template-columns: repeat(8, minmax(0, 1fr)); grid-template-rows: none; width: 100%; }
   .sq { aspect-ratio: 1; }
   .wt-log { max-height: 90px; }
+}
+
+/* ---------- touch and small screens (mobile audit, tools/mobile-audit.mjs) ---------- */
+@media (pointer: coarse) {
+  /* Finger-sized targets: 40 px minimum, 42 px for icon buttons. */
+  .btn { min-height: 40px; }
+  .btn.icon { width: 42px; height: 42px; }
+  .toolbar .btn { min-width: 42px; }
+  .compass { width: 40px; height: 40px; }
+}
+/* Portrait phones: a selection docks at the bottom in place of the minimap, leaving the middle of the map free to tap. */
+@media (max-width: 900px) and (min-height: 501px) {
+  .selection { bottom: var(--gutter); }
+  body:has(.selection) .bottom-left { display: none; }
+  .selection .sel-foot { display: none; }
+  .sel-actions { flex-wrap: nowrap; overflow-x: auto; }
+  .sel-actions .btn { flex: none; }
+}
+@media (pointer: coarse) {
+  .army .btn { min-width: 44px; }
+  .roster-chip { width: 40px; height: 42px; }
+  .log-head { min-height: 40px; }
+  .wt-legend summary { padding: 10px 0; }
+}
+@media (max-width: 480px) {
+  .toolbar { justify-content: space-between; gap: 4px; }
+  .toolbar .btn { padding-left: 9px; padding-right: 9px; }
+}
+/* Phones held sideways: little height, so the HUD hugs the edges and the War Table fits the screen. */
+@media (max-height: 500px) and (min-width: 600px) {
+  .resources { top: var(--gutter); left: var(--gutter); right: auto; gap: 12px; padding: 6px 10px; }
+  .toolbar { left: auto; right: var(--gutter); top: var(--gutter); }
+  .army { top: 64px; }
+  .log { top: 64px; max-height: calc(100dvh - 74px); }
+  .perf { top: 64px; }
+  .minimap canvas { width: 112px !important; }
+  .selection { left: var(--gutter); right: auto; transform: none; bottom: var(--gutter); width: min(360px, 46vw); padding: 8px 12px; }
+  body:has(.selection) .bottom-left { display: none; }
+  .log { width: min(280px, 34vw); }
+  .selection .sel-foot, .selection .sel-text { display: none; }
+  .selection h2 { font-size: 19px; }
+  .roster { margin-top: 6px; }
+  .sel-actions { margin-top: 6px; }
+  .wartable { top: var(--gutter); max-height: calc(100dvh - 2 * var(--gutter)); overflow: auto; padding: 8px 12px; }
+  .wt-body { grid-template-columns: auto minmax(0, 1fr); margin-top: 6px; }
+  .wt-board { --sq: min(40px, calc((100dvh - 2 * var(--gutter) - 84px) / 8)); grid-template-columns: repeat(8, var(--sq)); grid-template-rows: repeat(8, var(--sq)); width: auto; }
+  .sq { aspect-ratio: auto; }
+  .menu { padding: 12px 16px; }
+  .menu h2 { font-size: 21px; }
+  .stats { margin-top: 6px; }
+  .stats th, .stats td { padding: 3px 6px; }
+  .menu-actions { margin-top: 10px; }
+  .title-text { display: none; }
+}
+
+@media (min-width: 901px) and (max-width: 1180px) and (min-height: 501px) {
+  .selection { left: var(--gutter); transform: none; bottom: calc(var(--gutter) + 200px); }
 }

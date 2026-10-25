@@ -12,6 +12,14 @@ const home = toWorld(sun);
 const centre = { x: (realm.bounds.minX + realm.bounds.maxX) / 2, z: (realm.bounds.minZ + realm.bounds.maxZ) / 2 };
 
 export const HOME_POSE: CamPose = { x: home.x + 4, z: home.z - 1, yaw: 0, dist: 30 };
+/**
+ * Where a battle opens. On a tall, narrow screen the default framing leaves the
+ * soldiers tiny, so portrait phones start closer, centred on the army.
+ */
+export function homePose(): CamPose {
+  const portrait = typeof window !== 'undefined' && window.innerHeight > window.innerWidth * 1.15;
+  return portrait ? { ...HOME_POSE, x: home.x + 6.5, dist: 21 } : HOME_POSE;
+}
 export const OVERVIEW_POSE: CamPose = { x: centre.x, z: centre.z + 2, yaw: 0, dist: 80 };
 
 export const cam = {
