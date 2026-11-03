@@ -3,14 +3,17 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "scripts": { "dev": "vite", "build": "vite build", "preview": "vite preview" },
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
   "dependencies": {
-    "@cr/game-core": "workspace:*",
-    "@cr/chess-core": "workspace:*",
-    "@cr/match": "workspace:*",
+    "@cr/game-core": "*",
+    "@cr/chess-core": "*",
+    "@cr/match": "*",
     "three": "0.186.1",
     "@react-three/fiber": "9.8.2",
-    
     "react": "19.3.1",
     "react-dom": "19.3.1",
     "zustand": "5.0.16"

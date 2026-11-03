@@ -13,7 +13,7 @@ export default defineConfig({
     },
   },
   webServer: {
-    command: 'pnpm --filter @cr/web build && pnpm --filter @cr/web preview --port 4173 --strictPort',
+    command: 'npm run build -w @cr/web && npm run preview -w @cr/web -- --port 4173 --strictPort',
     port: Number(process.env.PORT ?? 4173),
     reuseExistingServer: true,
     timeout: 120_000,

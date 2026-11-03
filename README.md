@@ -18,14 +18,18 @@ This repository is at **milestone 6**. You can play a whole battle against the M
 ## Run it
 
 ```bash
-pnpm install
-pnpm dev          # http://localhost:5173 (single player)
-pnpm test         # unit tests (Vitest)
-pnpm build        # production build in apps/web/dist
+npm install
+npm run dev       # http://localhost:5173
+npm test          # unit tests (Vitest)
+npm run build     # production build in ./dist (and apps/web/dist)
 npx playwright test   # browser tests (builds and serves the app first)
 ```
 
-You need Node 20 or later and pnpm 10.
+You need Node 20 or later (npm comes with it).
+
+### Deploying
+
+Any static host works: install command `npm install` (or `npm ci`), build command `npm run build`, output folder `dist`. No server is needed for single-player and pass-and-play. The `deploy` branch also holds a ready-built copy for hosts that cannot build.
 
 ### Online (authoritative server)
 

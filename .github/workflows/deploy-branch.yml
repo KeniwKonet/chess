@@ -15,14 +15,12 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: pnpm/action-setup@v4
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-          cache: pnpm
-      - run: pnpm install --frozen-lockfile
-      # Relative paths: works at a domain root or in a subfolder.
-      - run: pnpm --filter @cr/web exec vite build --base ./
+          cache: npm
+      - run: npm ci
+      - run: npm run build -w @cr/web
       - name: Publish to the deploy branch
         run: |
           cd apps/web/dist
