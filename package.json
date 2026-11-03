@@ -2,13 +2,14 @@
   "name": "chess-realms",
   "private": true,
   "type": "module",
-  "packageManager": "pnpm@10.28.0",
   "scripts": {
-    "dev": "pnpm --filter @cr/web dev",
-    "build": "pnpm --filter @cr/web build",
+    "dev": "npm run dev -w @cr/web",
+    "build": "npm run build -w @cr/web && node tools/copy-dist.mjs",
+    "preview": "npm run preview -w @cr/web",
+    "server": "npm run start -w @cr/server",
     "assets": "node tools/build-assets.mjs",
     "test": "vitest run",
-    "typecheck": "pnpm -r exec tsc --noEmit"
+    "typecheck": "npm exec --workspaces -- tsc --noEmit"
   },
   "devDependencies": {
     "@gltf-transform/core": "4.5.1",
@@ -19,5 +20,12 @@
     "meshoptimizer": "1.3.0",
     "typescript": "5.9.3",
     "vitest": "5.0.5"
+  },
+  "workspaces": [
+    "packages/*",
+    "apps/*"
+  ],
+  "engines": {
+    "node": ">=20"
   }
 }
