@@ -124,8 +124,9 @@ export const director = {
       .catch((e) => console.error('[Kingdom] scene failed', e))
       .finally(() => {
         this.pending--;
-        // Whatever happened on screen, end the scene on the true board.
-        settle(tracker);
+        // Once the queue has caught up, end on the true board, whatever happened on screen.
+        // (Not between queued scenes: the tracker already holds the later moves.)
+        if (this.pending === 0) settle(tracker);
         this.rev++;
       });
     return this.queue;
