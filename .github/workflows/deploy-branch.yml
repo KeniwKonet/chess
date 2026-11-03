@@ -1,0 +1,36 @@
+# Builds the site on every push to main and publishes the static files to the
+# `deploy` branch, so any static host can serve it with no install or build step.
+name: Publish deploy branch
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+permissions:
+  contents: write
+concurrency:
+  group: deploy-branch
+  cancel-in-progress: true
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      # Relative paths: works at a domain root or in a subfolder.
+      - run: pnpm --filter @cr/web exec vite build --base ./
+      - name: Publish to the deploy branch
+        run: |
+          cd apps/web/dist
+          touch .nojekyll
+          printf '# Chess Realms: ready-to-serve site\n\nBuilt from main (%s) by .github/workflows/deploy-branch.yml.\nServe this branch as-is: no install, no build command, output folder = repository root.\n' "${GITHUB_SHA::7}" > README.md
+          git init -q -b deploy
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -q -m "Static build of main (${GITHUB_SHA::7})"
+          git push -q -f "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git" deploy
