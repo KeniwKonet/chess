@@ -5,9 +5,9 @@
  */
 import { useEffect, useState } from 'react';
 import { DIFFICULTY, type Difficulty } from '@cr/game-core';
-import { useUi, type Quality } from '../state/ui';
+import { useUi, IS_MOBILE, type Quality } from '../state/ui';
 import { game, newMatch, PLAYER, onlineServer, connectRemote } from '../sim/runner';
-import { flyTo, HOME_POSE, OVERVIEW_POSE } from '../camera/camera';
+import { flyTo, homePose, OVERVIEW_POSE } from '../camera/camera';
 
 const clock = (ticks: number) => {
   const s = Math.floor(ticks / 10);
@@ -22,7 +22,13 @@ export function startMatch(d: Difficulty) {
   ui.setPaused(false);
   useUi.setState({ result: null, showWarTable: false });
   game.paused = false;
-  flyTo(HOME_POSE);
+  // Portrait phones open close to the army, so frame it rather than the castle.
+  const home = homePose();
+  const us = game.sim.units.filter((u) => u.side === PLAYER);
+  const portrait = window.innerHeight > window.innerWidth * 1.15;
+  if (portrait && us.length) {
+    flyTo({ ...home, x: us.reduce((a, u) => a + u.x, 0) / us.length - 1, z: us.reduce((a, u) => a + u.z, 0) / us.length });
+  } else flyTo(home);
 }
 
 export function setPaused(p: boolean) {
@@ -195,7 +201,7 @@ function Summary() {
 }
 
 function Settings() {
-  const { quality, setQuality, showLabels, edgeScroll, toggle } = useUi();
+  const { quality, setQuality, showLabels, showPerf, edgeScroll, toggle } = useUi();
   const qs: Quality[] = ['low', 'medium', 'high'];
   return (
     <div className="menu-scrim" onClick={() => toggle('showSettings')}>
@@ -220,9 +226,15 @@ function Settings() {
           <button className={`btn${showLabels ? ' on' : ''}`} aria-pressed={showLabels} onClick={() => toggle('showLabels')}>{showLabels ? 'On' : 'Off'}</button>
         </div>
         <div className="setting">
-          <span>Edge panning</span>
-          <button className={`btn${edgeScroll ? ' on' : ''}`} aria-pressed={edgeScroll} onClick={() => toggle('edgeScroll')}>{edgeScroll ? 'On' : 'Off'}</button>
+          <span>Performance stats (frame rate)</span>
+          <button className={`btn${showPerf ? ' on' : ''}`} aria-pressed={showPerf} onClick={() => toggle('showPerf')}>{showPerf ? 'On' : 'Off'}</button>
         </div>
+        {!IS_MOBILE && (
+          <div className="setting">
+            <span>Edge panning</span>
+            <button className={`btn${edgeScroll ? ' on' : ''}`} aria-pressed={edgeScroll} onClick={() => toggle('edgeScroll')}>{edgeScroll ? 'On' : 'Off'}</button>
+          </div>
+        )}
       </section>
     </div>
   );
