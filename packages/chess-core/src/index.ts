@@ -90,3 +90,5 @@ export class StandardGame {
 }
 export * from './bonds';
 export type { Square } from 'chess.js';
+export * from './kingdom';
+export * from './kingdomAi';

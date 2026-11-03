@@ -279,7 +279,7 @@ function Help() {
   );
 }
 
-function PerfPanel() {
+export function PerfPanel() {
   const show = useUi((s) => s.showPerf);
   const quality = useUi((s) => s.quality);
   const ref = useRef<HTMLPreElement>(null);

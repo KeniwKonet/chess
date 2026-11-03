@@ -12,7 +12,7 @@ test.beforeEach(async ({ page }) => {
   const gl: string[] = [];
   page.on('console', (m) => /Shader Error|program not valid/.test(m.text()) && gl.push(m.text().slice(0, 200)));
   (page as unknown as { glErrors: string[] }).glErrors = gl;
-  await page.goto('/');
+  await page.goto('/?mode=battle');
   await page.waitForSelector('body[data-ready="1"]', { timeout: 60_000 });
   // Skip the title screen.
   await page.evaluate(() => window.__crStart!('captain'));

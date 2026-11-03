@@ -33,13 +33,14 @@ export interface BakedClip {
   duration: number;
 }
 
-export interface UnitModel {
-  type: UnitType;
+export interface UnitModel<C extends string = ClipName> {
+  /** Key of the character (a battle unit type, or a Chess Kingdom piece model). */
+  type: string;
   geometry: THREE.BufferGeometry;
   /** Simplified geometry (about 40% of the triangles) for mid-range zoom, same skinning. */
   lodGeometry: THREE.BufferGeometry;
   bake: THREE.DataTexture;
-  clips: Record<ClipName, BakedClip>;
+  clips: Record<C, BakedClip>;
   bones: number;
   /** Uniform scale that makes the model UNIT_HEIGHT tall. */
   scale: number;
@@ -65,12 +66,23 @@ export function buildUnitModels(gltf: GLTF): Record<UnitType, UnitModel> {
     const name = MODEL_OF[type];
     const root = gltf.scene.getObjectByName(name);
     if (!root) throw new Error(`units file has no "${name}" model`);
-    out[type] = bakeCharacter(type, root, gltf.animations.filter((a) => a.name.startsWith(`${name}|`)));
+    out[type] = bakeCharacter(type, root, gltf.animations.filter((a) => a.name.startsWith(`${name}|`)), CLIP_SOURCES[type], name);
   }
   return out;
 }
 
-function bakeCharacter(type: UnitType, root: THREE.Object3D, clips: THREE.AnimationClip[]): UnitModel {
+/**
+ * Flatten a character and bake the listed clips (game clip name -> clip name in the file,
+ * found as "<modelName>|<clip>"). Must include "idle", used for sizing.
+ */
+export function bakeCharacter<C extends string>(
+  type: string,
+  root: THREE.Object3D,
+  clips: THREE.AnimationClip[],
+  src: Record<C, string>,
+  modelName: string,
+  height = UNIT_HEIGHT,
+): UnitModel<C> {
   root.updateMatrixWorld(true);
   const R = root.matrixWorld.clone();
   const Rinv = R.clone().invert();
@@ -185,9 +197,8 @@ function bakeCharacter(type: UnitType, root: THREE.Object3D, clips: THREE.Animat
 
   // Bake every frame of each clip the game uses.
   const mixer = new THREE.AnimationMixer(root);
-  const src = CLIP_SOURCES[type];
-  const plan = (Object.keys(src) as ClipName[]).map((k) => {
-    const clip = clips.find((c) => c.name === `${MODEL_OF[type]}|${src[k]}`);
+  const plan = (Object.keys(src) as C[]).map((k) => {
+    const clip = clips.find((c) => c.name === `${modelName}|${src[k]}`);
     if (!clip) throw new Error(`${type}: clip ${src[k]} missing from the model file`);
     return { k, clip, frames: Math.max(2, Math.round(clip.duration * BAKE_FPS)) };
   });
@@ -195,7 +206,7 @@ function bakeCharacter(type: UnitType, root: THREE.Object3D, clips: THREE.Animat
   const width = entries.length * 4;
   const data = new Float32Array(width * totalRows * 4);
   const F = new THREE.Matrix4();
-  const clipsOut = {} as Record<ClipName, BakedClip>;
+  const clipsOut = {} as Record<C, BakedClip>;
   let row = 0;
   for (const p of plan) {
     mixer.stopAllAction();
@@ -218,7 +229,7 @@ function bakeCharacter(type: UnitType, root: THREE.Object3D, clips: THREE.Animat
   // Size and anchor from the first Idle frame as actually posed (bind space is not a pose).
   // Feet: centre of the body (skinned parts, weapons excluded) at its lowest point.
   const body = new THREE.Box3();
-  const idleRow = clipsOut.idle.start;
+  const idleRow = (clipsOut as Record<string, BakedClip>).idle!.start;
   const M = new THREE.Matrix4();
   const acc = new THREE.Vector3();
   for (let i = 0; i < skinnedVertexCount; i++) {
@@ -231,7 +242,7 @@ function bakeCharacter(type: UnitType, root: THREE.Object3D, clips: THREE.Animat
     }
     body.expandByPoint(acc);
   }
-  const scale = UNIT_HEIGHT / Math.max(0.01, body.max.y - body.min.y);
+  const scale = height / Math.max(0.01, body.max.y - body.min.y);
   const feet = new THREE.Vector3((body.min.x + body.max.x) / 2, body.min.y, (body.min.z + body.max.z) / 2);
   const bake = new THREE.DataTexture(data, width, totalRows, THREE.RGBAFormat, THREE.FloatType);
   bake.magFilter = THREE.NearestFilter;
@@ -242,7 +253,7 @@ function bakeCharacter(type: UnitType, root: THREE.Object3D, clips: THREE.Animat
 }
 
 /** Standard material that skins vertices from the baked texture, per instance. */
-export function bakedMaterial(model: UnitModel, map: THREE.Texture): THREE.MeshStandardMaterial {
+export function bakedMaterial(model: UnitModel<string>, map: THREE.Texture): THREE.MeshStandardMaterial {
   const mat = new THREE.MeshStandardMaterial({ map, roughness: 0.75, metalness: 0 });
   mat.onBeforeCompile = (shader) => {
     shader.uniforms.uBake = { value: model.bake };
