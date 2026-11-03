@@ -14,16 +14,13 @@ await page.addInitScript(() => {
   window.__manual = () => (manual = true);
   window.__frame = () => { const c = q; q = []; const t = performance.now(); for (const cb of c) cb(t); };
 });
+await page.addInitScript(() => localStorage.setItem('cr-kingdom', JSON.stringify({ flipEachTurn: false, tc: 'untimed' })));
 await page.goto(process.env.URL ?? 'http://localhost:4174/');
 await page.waitForSelector('body[data-ready="1"]', { timeout: 180000 });
 await page.waitForSelector('body[data-pieces="1"]', { timeout: 180000 });
 await page.evaluate(() => window.__manual());
 await page.clock.pauseAt(await page.evaluate(() => Date.now() + 50));
 const idle = async (ms) => { for (let t = 0; t < ms; t += 100) { await page.clock.runFor(100); await page.evaluate(() => window.__frame()); } };
-await page.evaluate(() => localStorage.setItem('cr-kingdom', JSON.stringify({ flipEachTurn: false, tc: 'untimed' })));
-await page.reload();
-await page.waitForSelector('body[data-pieces="1"]', { timeout: 180000 });
-await page.evaluate(() => window.__manual());
 await page.getByRole('button', { name: /Two players/ }).click();
 await page.getByRole('button', { name: 'To battle' }).click();
 await page.evaluate(() => { const k = window.__crKingdom; k.kc.you = 'both'; });
@@ -31,7 +28,8 @@ await idle(1500);
 await page.evaluate(() => window.__crKingdom.settleCamera());
 await idle(300);
 let n = 0;
-const shot = async () => { await page.clock.runFor(1000 / FPS); await page.evaluate(() => window.__frame()); await page.screenshot({ path: `${OUT}/f${String(n++).padStart(4, '0')}.jpg`, type: 'jpeg', quality: 80 }); };
+const cdp = await page.context().newCDPSession(page);
+const shot = async () => { await page.clock.runFor(1000 / FPS); await page.evaluate(() => window.__frame()); const r = await cdp.send('Page.captureScreenshot', { format: 'jpeg', quality: 80 }); fs.writeFileSync(`${OUT}/f${String(n++).padStart(4, '0')}.jpg`, Buffer.from(r.data, 'base64')); };
 const moves = (process.env.MOVES ?? 'e4 d5 exd5 Qxd5 Nc3 Qa5').split(' ');
 for (const m of moves) {
   await page.evaluate((mv) => window.__crKingdom.play(mv), m);
