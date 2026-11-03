@@ -201,7 +201,7 @@ function Summary() {
 }
 
 function Settings() {
-  const { quality, setQuality, showLabels, edgeScroll, toggle } = useUi();
+  const { quality, setQuality, showLabels, showPerf, edgeScroll, toggle } = useUi();
   const qs: Quality[] = ['low', 'medium', 'high'];
   return (
     <div className="menu-scrim" onClick={() => toggle('showSettings')}>
@@ -224,6 +224,10 @@ function Settings() {
         <div className="setting">
           <span>Map labels</span>
           <button className={`btn${showLabels ? ' on' : ''}`} aria-pressed={showLabels} onClick={() => toggle('showLabels')}>{showLabels ? 'On' : 'Off'}</button>
+        </div>
+        <div className="setting">
+          <span>Performance stats (frame rate)</span>
+          <button className={`btn${showPerf ? ' on' : ''}`} aria-pressed={showPerf} onClick={() => toggle('showPerf')}>{showPerf ? 'On' : 'Off'}</button>
         </div>
         {!IS_MOBILE && (
           <div className="setting">

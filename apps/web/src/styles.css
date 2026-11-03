@@ -387,6 +387,9 @@ button { font: inherit; color: inherit; }
   .log-head { min-height: 40px; }
   .wt-legend summary { padding: 10px 0; }
 }
+@media (max-width: 900px) and (min-height: 501px) {
+  .perf { top: 160px; }
+}
 @media (max-width: 480px) {
   .toolbar { justify-content: space-between; gap: 4px; }
   .toolbar .btn { padding-left: 9px; padding-right: 9px; }
@@ -397,7 +400,7 @@ button { font: inherit; color: inherit; }
   .toolbar { left: auto; right: var(--gutter); top: var(--gutter); }
   .army { top: 64px; }
   .log { top: 64px; max-height: calc(100dvh - 74px); }
-  .perf { top: 64px; }
+  .perf { top: 116px; }
   .minimap canvas { width: 112px !important; }
   .selection { left: var(--gutter); right: auto; transform: none; bottom: var(--gutter); width: min(360px, 46vw); padding: 8px 12px; }
   body:has(.selection) .bottom-left { display: none; }
