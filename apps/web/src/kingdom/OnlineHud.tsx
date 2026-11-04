@@ -28,6 +28,8 @@ import {
 } from './online';
 import { toast, useKingdom } from './store';
 import { shareResult } from './share';
+import { SocialBar } from './AccountHud';
+import { openPanel, openProfile, openReport } from './social';
 
 const tcLabel = (tc: OnlineTc) => (tc === 'untimed' ? 'No clock' : `${tc.replace('+', ' min + ')} s`);
 const tcShort = (tc: OnlineTc) => (tc === 'untimed' ? '∞' : tc);
@@ -68,6 +70,7 @@ export function OnlineScreen() {
           </button>
           <h2>Play online</h2>
           <LinkDot />
+          <SocialBar />
         </header>
         {view === 'join' ? <JoinPrompt /> : !token ? <SignIn /> : view === 'invite' ? <InviteWaiting /> : view === 'seeking' ? <Seeking /> : <Lobby />}
       </section>
@@ -92,8 +95,9 @@ export function SignIn({ after }: { after?: () => void }) {
   const [mode, setMode] = useState<'guest' | 'login' | 'register'>('guest');
   const [name, setName] = useState('');
   const [pw, setPw] = useState('');
+  const [email, setEmail] = useState('');
   const go = async () => {
-    const ok = mode === 'guest' ? await playAsGuest() : mode === 'login' ? await login(name, pw) : await register(name, pw);
+    const ok = mode === 'guest' ? await playAsGuest() : mode === 'login' ? await login(name, pw) : await register(name, pw, email.trim() || undefined);
     if (ok) after?.();
   };
   const nameOk = NAME_RULE.test(name);
@@ -128,6 +132,15 @@ export function SignIn({ after }: { after?: () => void }) {
             </label>
             {mode === 'register' && pw && !pwOk && <small className="k-hint">At least {PASSWORD_MIN} characters.</small>}
           </>
+        )}
+        {mode === 'register' && (
+          <label>
+            <span>Email (optional, for password resets)</span>
+            <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} autoComplete="email" />
+          </label>
+        )}
+        {mode === 'login' && (
+          <button type="button" className="k-link-btn k-forgot" onClick={() => openPanel('forgot')}>Forgot your password?</button>
         )}
         {mode === 'guest' && <p className="menu-sub">You get a name like Guest-48211. Casual games only; you can make an account later and keep your games.</p>}
         <ErrorLine />
@@ -203,6 +216,7 @@ function Lobby() {
         <div className="k-me-actions">
           {u && !u.guest && u.record && u.record.games > 0 && <button className="btn" onClick={() => shareProfile(u)}>Share</button>}
           {u?.guest && <button className="btn" onClick={() => setUpgrade((x) => !x)}>Make an account</button>}
+          {u?.admin && <button className="btn" onClick={() => useKingdom.setState({ screen: 'admin' })}>Admin</button>}
           <button className="btn" onClick={() => void logout()}>Sign out</button>
         </div>
       </div>
@@ -341,7 +355,7 @@ function Leaderboard() {
           {rows.map((r, i) => (
             <li key={r.name}>
               <span className="k-rank">{i + 1}</span>
-              <span className="k-board-name">{r.name}</span>
+              <button className="k-board-name k-link-btn" onClick={() => void openProfile(r.name)}>{r.name}</button>
               <span className="k-board-rating">{r.rating}{r.provisional ? '?' : ''}</span>
               <small>{r.games} game{r.games === 1 ? '' : 's'}</small>
             </li>
@@ -509,6 +523,9 @@ export function OnlineResult() {
           )}
           <button className="btn" onClick={() => useKingdom.setState({ showResult: false, showMoves: true })}>Review the moves</button>
           <button className="btn" onClick={() => copyText(you ? watchLink(g.code) : location.href)}>Copy game link</button>
+          {you && opp && (g.white && g.black) && (
+            <button className="btn" onClick={() => openReport((opp === 'w' ? g.white : g.black)!.name, g.code)}>Report</button>
+          )}
           <button className="btn" onClick={backToLobby}>Back to the lobby</button>
         </div>
       </section>
@@ -599,7 +616,7 @@ function Rivals({ name }: { name: string }) {
       {rows.map((r) => (
         <li key={r.name}>
           <span className="k-rank">{r.wins > r.losses ? '▲' : r.wins < r.losses ? '▼' : '='}</span>
-          <span className="k-board-name">{r.name}</span>
+          <button className="k-board-name k-link-btn" onClick={() => void openProfile(r.name)}>{r.name}</button>
           <span className="k-board-rating">{r.wins}–{r.losses}</span>
           <small>{r.draws ? `${r.draws} drawn` : ''}</small>
         </li>

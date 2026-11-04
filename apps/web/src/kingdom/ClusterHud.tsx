@@ -42,6 +42,7 @@ import { kc } from './controller';
 import { openSocket, useOnline } from './online';
 import { SignInPanel } from './OnlineHud';
 import { shareResult } from './share';
+import { SocialBar } from './AccountHud';
 import { toast, useKingdom } from './store';
 
 const ROLE_GLYPH = (r: ClusterRole) => GLYPH[r[0] as 'k' | 'q' | 'r' | 'b' | 'n' | 'p'];
@@ -89,6 +90,7 @@ export function ClustersScreen() {
             ←
           </button>
           <h2>{viewing ? viewing.name : mine && token && !user?.guest ? mine.name : 'Clash of Clusters'}</h2>
+          <SocialBar />
         </header>
         {!token ? (
           <>

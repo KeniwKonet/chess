@@ -8,6 +8,9 @@ import { enterOnline, useOnline } from './online';
 import { OnlineBanner, OnlineMenuExtras, OnlineResult, OnlineScreen } from './OnlineHud';
 import { ClashMenuExtras, ClashPanel, ClashResult, ClustersScreen } from './ClusterHud';
 import { useClusters } from './clash';
+import { SocialBar, SocialPanels } from './AccountHud';
+import { TournamentsScreen } from './TournamentHud';
+import { AdminScreen } from './AdminHud';
 import { useKingdom } from './store';
 import { director } from './director';
 import { unlockAudio } from './sound';
@@ -22,6 +25,9 @@ export function KingdomHud() {
       {screen === 'setup' && <Setup />}
       {screen === 'online' && <OnlineScreen />}
       {screen === 'clusters' && <ClustersScreen />}
+      {screen === 'tournaments' && <TournamentsScreen />}
+      {screen === 'admin' && <AdminScreen />}
+      <SocialPanels />
       {screen === 'playing' && <Playing />}
     </div>
   );
@@ -33,6 +39,7 @@ const MODES: { id: string; title: string; blurb: string; tag?: string }[] = [
   { id: 'ai', title: 'Play the computer', blurb: 'Four commanders, from Squire to Warlord.' },
   { id: 'online', title: 'Play online', blurb: 'Invite a friend by link or get paired. Ratings, streaks, rivals.' },
   { id: 'clusters', title: 'Clash of Clusters', blurb: 'Your team is one army: every member commands a soldier.', tag: 'New' },
+  { id: 'tournaments', title: 'Tournaments', blurb: 'Swiss and knockout events with live standings.', tag: 'New' },
   { id: 'local', title: 'Two players, one device', blurb: 'Pass and play, with chess clocks.' },
   { id: 'battle', title: 'Real-time battle', blurb: 'Armies march live while a chessboard commands them.' },
 ];
@@ -44,6 +51,7 @@ function Home() {
     if (id === 'ai' || id === 'local') useKingdom.setState({ opponent: id, screen: 'setup' });
     else if (id === 'online') enterOnline();
     else if (id === 'clusters') useKingdom.setState({ screen: 'clusters' });
+    else if (id === 'tournaments') useKingdom.setState({ screen: 'tournaments' });
     else if (id === 'battle') location.search = '?mode=battle';
   };
   return (
@@ -55,6 +63,7 @@ function Home() {
             <h1>ChessFront</h1>
             <p className="title-sub">The Living Chess Experience</p>
           </div>
+          <SocialBar />
         </header>
         <p className="k-lede">Two kingdoms at war, and every soldier moves by the rules of chess. Choose how you want to fight.</p>
         <ul className="k-modecards">
