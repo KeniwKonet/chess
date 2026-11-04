@@ -121,8 +121,8 @@
 
 /* Mode picker */
 .k-picker { width: min(1000px, 100%); }
-.k-picker-head > div { flex: 1; }
-.k-picker .k-modecard-shot { aspect-ratio: 16 / 8; }
+.k-picker-head .k-picker-title { flex: 1; }
+.k-picker .k-modecard-shot { aspect-ratio: 16 / 7; }
 .k-picker-head { display: flex; align-items: center; gap: 14px; }
 .k-picker-head .title-mark { font-size: 46px; color: var(--sun); }
 .k-picker-head h1 { margin: 0; }

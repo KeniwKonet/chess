@@ -59,7 +59,7 @@ function Home() {
       <section className="k-home k-picker panel" aria-label="ChessFront">
         <header className="k-picker-head">
           <span className="title-mark" aria-hidden="true">♜</span>
-          <div>
+          <div className="k-picker-title">
             <h1>ChessFront</h1>
             <p className="title-sub">The Living Chess Experience</p>
           </div>

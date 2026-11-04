@@ -5,7 +5,7 @@ import { Settings } from '../hud/Settings';
 import { KingdomPerf } from './KingdomPerf';
 import { KingdomScene } from './KingdomScene';
 import { KingdomHud, syncDirectorSpeed } from './KingdomHud';
-import { openFromUrl } from './online';
+import { openFromUrl, openSocket, useOnline } from './online';
 import { kc } from './controller';
 import { director } from './director';
 import './kingdom.css';
@@ -19,7 +19,8 @@ export function KingdomApp() {
     if (director.pieces.size === 0) director.sync(kc.game.tracker);
     document.title = 'ChessFront · The Living Chess Experience';
     // An invite (?play=…) or spectator (?watch=…) link opens straight into online play.
-    openFromUrl();
+    // Signed in: connect now, so notifications, challenges and tournament games reach you anywhere in the game.
+    if (!openFromUrl() && useOnline.getState().token) openSocket();
   }, []);
   return (
     <div className="app kingdom">
