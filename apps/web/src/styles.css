@@ -88,7 +88,9 @@ button { font: inherit; color: inherit; }
   position: absolute; top: var(--gutter); left: var(--gutter);
   display: flex; align-items: center; gap: 10px; padding: 8px 12px 8px 10px;
 }
-.brand-mark { font-size: 26px; color: var(--sun); text-shadow: 0 2px 0 #5a4218; }
+.brand-mark { width: 34px; height: 34px; border-radius: 7px; display: block; }
+.title-logo { margin: 0 0 12px; line-height: 0; }
+.title-logo img { width: min(300px, 70vw); height: auto; }
 .brand-name { font-family: var(--font-display); font-size: 19px; letter-spacing: 0.04em; }
 .brand-sub { font-size: 12px; color: var(--parchment-dim); }
 
@@ -428,6 +430,7 @@ button { font: inherit; color: inherit; }
 /* Shown when the browser cannot draw 3D (Root.tsx). */
 .no-webgl { position: fixed; inset: 0; display: grid; place-items: center; padding: var(--gutter, 16px); background: radial-gradient(ellipse at center, #2a1f14, #0e0a06); }
 .no-webgl .panel { width: min(480px, 100%); padding: 24px; text-align: center; }
-.no-webgl h1 { font-family: var(--font-display); font-weight: 400; font-size: 40px; margin: 4px 0 0; }
+.no-webgl h1 { margin: 0 0 6px; line-height: 0; }
+.no-webgl-logo img { width: min(320px, 100%); height: auto; }
 .no-webgl p { line-height: 1.55; color: var(--parchment); }
 .no-webgl .btn { margin-top: 8px; }

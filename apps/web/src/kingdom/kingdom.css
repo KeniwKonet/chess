@@ -122,6 +122,10 @@
 /* Mode picker */
 .k-picker { width: min(1000px, 100%); }
 .k-picker-head .k-picker-title { flex: 1; }
+.k-logo { margin: 0; flex: 1; line-height: 0; }
+.k-logo img { width: min(260px, 62vw); height: auto; display: block; }
+@media (max-height: 820px) and (min-width: 700px) { .k-logo img { width: 210px; } .k-picker .k-lede { margin-top: 8px; } }
+.k-picker-head { align-items: flex-start; }
 .k-picker .k-modecard-shot { aspect-ratio: 16 / 7; }
 .k-picker-head { display: flex; align-items: center; gap: 14px; }
 .k-picker-head .title-mark { font-size: 46px; color: var(--sun); }

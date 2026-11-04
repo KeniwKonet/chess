@@ -6,6 +6,7 @@ import { KingdomPerf } from './KingdomPerf';
 import { KingdomScene } from './KingdomScene';
 import { KingdomHud, syncDirectorSpeed } from './KingdomHud';
 import { openFromUrl, openSocket, useOnline } from './online';
+import { hideSplash, splashStatus } from '../splash';
 import { kc } from './controller';
 import { director } from './director';
 import './kingdom.css';
@@ -14,6 +15,10 @@ export function KingdomApp() {
   const loaded = useUi((s) => s.loaded);
   const showSettings = useUi((s) => s.showSettings);
   useEffect(() => {
+    if (loaded) hideSplash();
+  }, [loaded]);
+  useEffect(() => {
+    splashStatus('Mustering the armies');
     syncDirectorSpeed();
     // Both armies stand on the field behind the menus.
     if (director.pieces.size === 0) director.sync(kc.game.tracker);
@@ -28,12 +33,6 @@ export function KingdomApp() {
       <KingdomHud />
       <KingdomPerf />
       {showSettings && <Settings kingdom />}
-      <div className={`loading${loaded ? ' done' : ''}`} aria-hidden={loaded}>
-        <div className="loading-mark">♜</div>
-        <div className="loading-title">ChessFront</div>
-        <div className="loading-sub">Mustering the armies…</div>
-        <div className="loading-bar"><span /></div>
-      </div>
     </div>
   );
 }

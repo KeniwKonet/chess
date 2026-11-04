@@ -3,7 +3,8 @@
  * piece) is the home screen; the real-time Battle of the Ashen Divide opens
  * with ?mode=battle (or ?server=… for its online mode).
  */
-import { lazy, Suspense } from 'react';
+import { lazy, Suspense, useEffect } from 'react';
+import { hideSplash } from './splash';
 import { KingdomApp } from './kingdom/KingdomApp';
 
 const BattleApp = lazy(() => import('./App').then((m) => ({ default: m.App })));
@@ -30,9 +31,9 @@ function NoWebGL() {
   return (
     <div className="no-webgl" role="alert">
       <section className="panel">
-        <div className="title-mark" aria-hidden="true">♜</div>
-        <h1>ChessFront</h1>
-        <p className="title-sub">The Living Chess Experience</p>
+        <h1 className="no-webgl-logo">
+          <img src={`${import.meta.env.BASE_URL}brand/logo.webp`} alt="ChessFront · The Living Chess Experience" width={1200} height={507} />
+        </h1>
         <p>
           This browser can't show 3D graphics, which the battlefield needs. Turn on hardware acceleration (or graphics
           acceleration) in your browser settings, update the browser, or open ChessFront in Chrome, Edge, Firefox or Safari.
@@ -44,6 +45,9 @@ function NoWebGL() {
 }
 
 export function Root() {
+  useEffect(() => {
+    if (!HAS_WEBGL) hideSplash();
+  }, []);
   if (!HAS_WEBGL) return <NoWebGL />;
   if (MODE === 'battle') {
     return (

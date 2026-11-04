@@ -41,7 +41,7 @@ export function Hud() {
 function TopLeft() {
   return (
     <div className="brand panel">
-      <div className="brand-mark" aria-hidden="true">♜</div>
+      <img className="brand-mark" src={`${import.meta.env.BASE_URL}brand/icon-192.png`} alt="" width={34} height={34} />
       <div>
         <div className="brand-name">ChessFront</div>
         <div className="brand-sub">The Ashen Divide · Sun vs Moon</div>
