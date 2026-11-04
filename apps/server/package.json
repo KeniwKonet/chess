@@ -12,11 +12,11 @@
     "@cr/match": "*",
     "@electric-sql/pglite": "0.5.10",
     "pg": "8.23.1",
-    "ws": "8.22.0"
+    "ws": "8.22.0",
+    "tsx": "^4"
   },
   "devDependencies": {
     "@types/pg": "^8.23.1",
-    "@types/ws": "^8",
-    "tsx": "^4"
+    "@types/ws": "^8"
   }
 }
