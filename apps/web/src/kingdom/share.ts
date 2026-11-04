@@ -33,6 +33,17 @@ function wrap(ctx: CanvasRenderingContext2D, text: string, maxW: number): string
   return lines;
 }
 
+let logoPromise: Promise<HTMLImageElement | null> | null = null;
+function loadLogo(): Promise<HTMLImageElement | null> {
+  logoPromise ??= new Promise((res) => {
+    const img = new Image();
+    img.onload = () => res(img);
+    img.onerror = () => res(null);
+    img.src = `${import.meta.env.BASE_URL}brand/logo.png`;
+  });
+  return logoPromise;
+}
+
 export async function drawCard(card: ShareCard): Promise<Blob> {
   const cv = document.createElement('canvas');
   cv.width = W;
@@ -55,16 +66,21 @@ export async function drawCard(card: ShareCard): Promise<Blob> {
   ctx.lineWidth = 6;
   ctx.strokeRect(36, 36, W - 72, H - 72);
 
-  ctx.fillStyle = '#e8b33a';
-  ctx.font = '120px serif';
+  // The logo at the top.
+  const logo = await loadLogo();
+  if (logo) {
+    const lw = 560;
+    const lh = (logo.height / logo.width) * lw;
+    ctx.drawImage(logo, (W - lw) / 2, 90, lw, lh);
+  }
   ctx.textAlign = 'center';
-  ctx.fillText('♜', W / 2, 220);
+  ctx.fillStyle = '#e8b33a';
   ctx.font = '600 34px "Barlow Condensed", Arial, sans-serif';
-  ctx.fillText(card.kicker.toUpperCase().split('').join(' '), W / 2, 300);
+  ctx.fillText(card.kicker.toUpperCase().split('').join(' '), W / 2, 380);
 
   ctx.fillStyle = '#f4ead3';
   ctx.font = '76px Marcellus, Georgia, serif';
-  let y = 410;
+  let y = 470;
   for (const l of wrap(ctx, card.title, W - 200)) {
     ctx.fillText(l, W / 2, y);
     y += 88;
@@ -92,12 +108,9 @@ export async function drawCard(card: ShareCard): Promise<Blob> {
     ctx.font = '600 24px "Barlow Condensed", Arial, sans-serif';
     ctx.fillText(card.badge.label.toUpperCase(), W - 170, 228);
   }
-  ctx.fillStyle = '#f4ead3';
-  ctx.font = '64px Marcellus, Georgia, serif';
-  ctx.fillText('ChessFront', W / 2, H - 150);
   ctx.fillStyle = '#9fb8de';
-  ctx.font = '600 34px "Barlow Condensed", Arial, sans-serif';
-  ctx.fillText('chessfront.app · The Living Chess Experience', W / 2, H - 95);
+  ctx.font = '600 38px "Barlow Condensed", Arial, sans-serif';
+  ctx.fillText('Play at chessfront.app', W / 2, H - 110);
   return new Promise((res, rej) => cv.toBlob((b) => (b ? res(b) : rej(new Error('no image'))), 'image/png'));
 }
 

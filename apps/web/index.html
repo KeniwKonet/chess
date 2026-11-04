@@ -4,23 +4,71 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
     <meta name="theme-color" content="#16110C" />
+    <meta name="color-scheme" content="dark" />
     <title>ChessFront · The Living Chess Experience</title>
-    <meta name="description" content="Two kingdoms at war, and every soldier moves by the rules of chess. Play the computer or a friend on a living 3D battlefield." />
+    <meta name="description" content="ChessFront is a 3D chess game where two kingdoms go to war and every soldier moves by the rules of chess. Play the computer, friends online, tournaments and team Clash of Clusters, free in your browser." />
+    <meta name="keywords" content="ChessFront, chess, 3D chess, online chess, chess game, chess tournaments, team chess, play chess free, Nigeria chess" />
+    <meta name="author" content="ChessFront" />
+    <meta name="robots" content="index, follow, max-image-preview:large" />
     <link rel="canonical" href="https://chessfront.app/" />
     <meta property="og:type" content="website" />
     <meta property="og:site_name" content="ChessFront" />
     <meta property="og:url" content="https://chessfront.app/" />
     <meta property="og:title" content="ChessFront · The Living Chess Experience" />
-    <meta property="og:description" content="Two kingdoms at war, and every soldier moves by the rules of chess. Play the computer or a friend on a living 3D battlefield." />
+    <meta property="og:description" content="Two kingdoms at war, and every soldier moves by the rules of chess. Play the computer, friends online, tournaments and Clash of Clusters." />
     <meta property="og:image" content="https://chessfront.app/og.jpg" />
+    <meta property="og:image:type" content="image/jpeg" />
     <meta property="og:image:width" content="1200" />
     <meta property="og:image:height" content="630" />
-    <meta property="og:image:alt" content="ChessFront: two armies of chess soldiers facing off on a 3D battlefield" />
+    <meta property="og:image:alt" content="The ChessFront logo beside two armies of chess soldiers on a 3D battlefield" />
+    <meta property="og:locale" content="en_GB" />
     <meta name="twitter:card" content="summary_large_image" />
     <meta name="twitter:title" content="ChessFront · The Living Chess Experience" />
     <meta name="twitter:description" content="Two kingdoms at war, and every soldier moves by the rules of chess." />
     <meta name="twitter:image" content="https://chessfront.app/og.jpg" />
-    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22%3E%3Ctext y=%22.9em%22 font-size=%2290%22%3E%E2%99%9C%3C/text%3E%3C/svg%3E" />
+    <meta name="twitter:image:alt" content="The ChessFront logo beside two armies of chess soldiers on a 3D battlefield" />
+    <link rel="icon" href="favicon.ico" sizes="48x48" />
+    <link rel="icon" type="image/png" sizes="32x32" href="brand/icon-32.png" />
+    <link rel="icon" type="image/png" sizes="16x16" href="brand/icon-16.png" />
+    <link rel="apple-touch-icon" sizes="180x180" href="brand/icon-180.png" />
+    <link rel="manifest" href="manifest.webmanifest" />
+    <meta name="apple-mobile-web-app-title" content="ChessFront" />
+    <meta name="application-name" content="ChessFront" />
+    <link rel="preload" as="image" href="brand/logo.webp" type="image/webp" />
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@type": "VideoGame",
+        "name": "ChessFront",
+        "alternateName": "ChessFront: The Living Chess Experience",
+        "url": "https://chessfront.app/",
+        "image": "https://chessfront.app/og.jpg",
+        "logo": "https://chessfront.app/brand/logo.png",
+        "description": "A 3D chess game where two kingdoms go to war and every soldier moves by the rules of chess. Play the computer, friends online, Swiss and knockout tournaments, and team Clash of Clusters.",
+        "genre": ["Chess", "Strategy", "Board game"],
+        "gamePlatform": ["Web browser", "Android", "iOS"],
+        "applicationCategory": "GameApplication",
+        "operatingSystem": "Any",
+        "playMode": ["SinglePlayer", "MultiPlayer"],
+        "inLanguage": "en",
+        "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" }
+      }
+    </script>
+    <style>
+      /* The splash: shown from the first moment, before any script has loaded. */
+      html, body { margin: 0; background: #0f0b07; }
+      #splash {
+        position: fixed; inset: 0; z-index: 9999; display: grid; place-content: center; justify-items: center; gap: 22px;
+        background: radial-gradient(ellipse at 50% 42%, #2b2116 0%, #120d08 62%, #0b0805 100%);
+        transition: opacity 0.7s ease, visibility 0s linear 0.7s;
+      }
+      #splash.done { opacity: 0; visibility: hidden; pointer-events: none; }
+      #splash img { width: min(72vw, 520px); height: auto; animation: cf-in 1s cubic-bezier(.2,.7,.2,1) both, cf-breathe 2.4s ease-in-out 1s infinite; }
+      #splash .splash-status { font: 500 13px/1.4 system-ui, sans-serif; letter-spacing: 0.18em; text-transform: uppercase; color: rgba(244, 234, 211, 0.55); min-height: 1.4em; animation: cf-in 1s ease 0.4s both; }
+      @keyframes cf-in { from { opacity: 0; transform: scale(0.96); } to { opacity: 1; transform: none; } }
+      @keyframes cf-breathe { 0%, 100% { opacity: 1; } 50% { opacity: 0.45; } }
+      @media (prefers-reduced-motion: reduce) { #splash img, #splash .splash-status { animation: none; } }
+    </style>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
@@ -29,6 +77,11 @@
     />
   </head>
   <body>
+    <div id="splash" role="status" aria-label="Loading ChessFront">
+      <img src="brand/logo.webp" alt="ChessFront · The Living Chess Experience" width="1200" height="507" />
+      <div class="splash-status">Loading</div>
+    </div>
+    <noscript><p style="color:#f4ead3;text-align:center;font-family:sans-serif;position:relative;z-index:10000">ChessFront needs JavaScript to play. Please turn it on and reload.</p></noscript>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>

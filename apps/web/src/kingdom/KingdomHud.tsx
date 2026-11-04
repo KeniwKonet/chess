@@ -58,11 +58,9 @@ function Home() {
     <div className="k-scrim">
       <section className="k-home k-picker panel" aria-label="ChessFront">
         <header className="k-picker-head">
-          <span className="title-mark" aria-hidden="true">♜</span>
-          <div className="k-picker-title">
-            <h1>ChessFront</h1>
-            <p className="title-sub">The Living Chess Experience</p>
-          </div>
+          <h1 className="k-logo">
+            <img src={`${import.meta.env.BASE_URL}brand/logo.webp`} alt="ChessFront · The Living Chess Experience" width={1200} height={507} />
+          </h1>
           <SocialBar />
         </header>
         <p className="k-lede">Two kingdoms at war, and every soldier moves by the rules of chess. Choose how you want to fight.</p>

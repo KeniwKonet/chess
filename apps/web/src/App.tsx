@@ -1,3 +1,4 @@
+import { hideSplash, splashStatus } from './splash';
 import { Component, Suspense, useEffect, type ReactNode } from 'react';
 import { Canvas } from '@react-three/fiber';
 import * as THREE from 'three';
@@ -96,12 +97,9 @@ export function App() {
 function Loading({ failed }: { failed: boolean }) {
   const loaded = useUi((s) => s.loaded);
   const ready = loaded || failed;
-  return (
-    <div className={`loading${ready ? ' done' : ''}`} aria-hidden={ready}>
-      <div className="loading-mark">♜</div>
-      <div className="loading-title">ChessFront</div>
-      <div className="loading-sub">Raising the Ashen Divide…</div>
-      <div className="loading-bar"><span /></div>
-    </div>
-  );
+  useEffect(() => {
+    if (ready) hideSplash();
+    else splashStatus('Raising the Ashen Divide');
+  }, [ready]);
+  return null;
 }
