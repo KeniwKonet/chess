@@ -6,6 +6,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 import WebSocket from 'ws';
 import type { ClashView, ClientMsg, ServerMsg } from '@cr/chess-core';
 import { startServer, type ServerHandle } from '../src/server';
+import { testDb } from './pg';
 
 let server: ServerHandle | null = null;
 let clock = 1_000_000;
@@ -19,7 +20,7 @@ afterEach(async () => {
 
 async function boot() {
   clock = 1_000_000;
-  server = await startServer(0, { autoTick: false, dataDir: 'memory://', hub: { now: () => clock, timers: false, log: () => {} } });
+  server = await startServer(0, { autoTick: false, ...(await testDb('memory://')), hub: { now: () => clock, timers: false, log: () => {} } });
 }
 const base = () => `http://127.0.0.1:${server!.port}`;
 async function call(path: string, token?: string, body?: unknown) {

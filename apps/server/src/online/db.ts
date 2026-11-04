@@ -249,5 +249,10 @@ export async function openDb(opts: { url?: string; dataDir?: string } = {}): Pro
   }
   // PGlite runs one statement per query() call with parameters; exec the schema statement by statement.
   for (const stmt of SCHEMA.split(';').map((s) => s.trim()).filter(Boolean)) await db.query(stmt);
+  // Lock every table to the server alone. On Supabase, tables in "public" are otherwise
+  // reachable through its Data API with the public key; with row level security on and
+  // no policies, only the database owner (this server) can read or write them.
+  const tables = await db.query<{ tablename: string }>("select tablename from pg_tables where schemaname = 'public'");
+  for (const t of tables) await db.query(`alter table public."${t.tablename.replace(/"/g, '')}" enable row level security`);
   return db;
 }

@@ -21,6 +21,18 @@ Create a database and copy its connection string. It looks like `postgres://user
 
 (Without `DATABASE_URL`, the server keeps an embedded database in `DATA_DIR` and writes a compressed backup next to it every day, keeping 7. This only works on a host with a persistent disk.)
 
+### Using Supabase
+
+1. In the Supabase dashboard, open your project and press **Connect** (top of the page).
+2. Choose **Session pooler** and copy the URI. It looks like `postgresql://postgres.<project-ref>:[YOUR-PASSWORD]@aws-0-<region>.pooler.supabase.com:5432/postgres`. Use the session pooler because the direct connection only works over IPv6, which many hosts don't have.
+3. Put in your database password (Project Settings → Database, where you can reset it if you've forgotten it). That full URI is `DATABASE_URL`.
+
+You don't need to create any tables. The server creates them the first time it starts, and switches on Row Level Security for every one of them, so Supabase's public Data API (and its public key) can't read players' emails or password hashes. Only the server, connecting with the database password, can.
+
+The GitHub connection in Supabase isn't needed for ChessFront. It's for projects that keep a `supabase/` migrations folder, and this one doesn't. You can leave it connected (it does nothing) or disconnect it.
+
+Free Supabase projects pause after a week with no activity. Once players are online every day this won't happen; otherwise, restore the project from the dashboard.
+
 ## 2. The server on Orbits
 
 If Orbits can run Node web services, create a **second project** from this same GitHub repository, with these settings:

@@ -7,6 +7,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 import WebSocket from 'ws';
 import type { ClientMsg, GameView, ServerMsg } from '@cr/chess-core';
 import { startServer, type ServerHandle } from '../src/server';
+import { testDb } from './pg';
 import { rate, NEW_RATING } from '../src/online/glicko';
 
 let server: ServerHandle | null = null;
@@ -19,9 +20,9 @@ afterEach(async () => {
   server = null;
 });
 
-async function boot(dataDir = 'memory://') {
+async function boot(dataDir = 'memory://', keep = false) {
   clock = 1_000_000;
-  server = await startServer(0, { autoTick: false, dataDir, hub: { now: () => clock, timers: false, log: () => {} } });
+  server = await startServer(0, { autoTick: false, ...(await testDb(dataDir, keep)), hub: { now: () => clock, timers: false, log: () => {} } });
   return server;
 }
 
@@ -339,7 +340,7 @@ describe('online games', () => {
     await w.next('move', (m) => m.ply === 2);
     for (const c of clients.splice(0)) c.ws.close();
     await server!.close();
-    await boot(dir);
+    await boot(dir, true);
     const w2 = await connect(tw);
     w2.send({ t: 'join', code });
     const g = await w2.game(code);
