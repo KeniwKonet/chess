@@ -7,12 +7,16 @@
     "start": "tsx src/main.ts"
   },
   "dependencies": {
-    "@cr/match": "*",
+    "@cr/chess-core": "*",
     "@cr/game-core": "*",
-    "ws": "8.22.0"
+    "@cr/match": "*",
+    "@electric-sql/pglite": "0.5.10",
+    "pg": "8.23.1",
+    "ws": "8.22.0",
+    "tsx": "^4"
   },
   "devDependencies": {
-    "@types/ws": "^8",
-    "tsx": "^4"
+    "@types/pg": "^8.23.1",
+    "@types/ws": "^8"
   }
 }

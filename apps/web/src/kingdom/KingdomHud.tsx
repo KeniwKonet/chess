@@ -4,6 +4,8 @@ import { AI_LEVELS, CHESS_NAME, ROLE_NAME, ROLE_RULE, resultText, TIME_CONTROLS,
 import { useUi } from '../state/ui';
 import { GLYPH } from './board';
 import { aiColour, choosePromotion, exitToHome, kc, offerDraw, resign, setAnimSpeed, setSound, startGame, takeback } from './controller';
+import { enterOnline, useOnline } from './online';
+import { OnlineBanner, OnlineMenuExtras, OnlineResult, OnlineScreen } from './OnlineHud';
 import { useKingdom, type Opponent } from './store';
 import { director } from './director';
 import { unlockAudio } from './sound';
@@ -16,6 +18,7 @@ export function KingdomHud() {
     <div className="k-hud">
       {screen === 'home' && <Home />}
       {screen === 'setup' && <Setup />}
+      {screen === 'online' && <OnlineScreen />}
       {screen === 'playing' && <Playing />}
     </div>
   );
@@ -47,9 +50,9 @@ function Home() {
             <span className="k-mode-glyph">♟</span>
             <span><b>Two players, one device</b><small>Pass and play, with chess clocks</small></span>
           </button>
-          <button className="k-mode" disabled>
+          <button className="k-mode" onClick={() => { unlockAudio(); enterOnline(); }}>
             <span className="k-mode-glyph">♛</span>
-            <span><b>Play online</b><small>Invite links, ratings and tournaments: coming next</small></span>
+            <span><b>Play online</b><small>Invite a friend by link, or get paired. Ratings and live spectators</small></span>
           </button>
         </div>
         <div className="k-home-foot">
@@ -142,8 +145,9 @@ function Playing() {
       <RoleCard />
       <Promotion />
       <Moves />
+      <OnlineBanner />
       <GameMenu />
-      <Result />
+      {kc.opponent === 'online' ? <OnlineResult /> : <Result />}
     </>
   );
 }
@@ -159,10 +163,16 @@ function clockText(ms: number) {
 function PlayerBar({ colour, where }: { colour: Colour; where: 'top' | 'bottom' }) {
   useTicker(100);
   const thinking = useKingdom((s) => s.thinking);
+  const og = useOnline((s) => s.game);
   const g = kc.game;
+  const away = kc.opponent === 'online' && og && og.status === 'playing' && !og.presence[colour];
   const name = (() => {
     if (kc.opponent === 'ai') return colour === aiColour() ? `${SIDE_NAME[colour]} · ${AI_LEVELS[useKingdom.getState().aiLevel].label} (computer)` : `${SIDE_NAME[colour]} · You`;
-    if (kc.opponent === 'online') return SIDE_NAME[colour];
+    if (kc.opponent === 'online') {
+      const p = colour === 'w' ? og?.white : og?.black;
+      if (!p) return SIDE_NAME[colour];
+      return `${p.name}${p.rating !== null ? ` · ${p.rating}${p.provisional ? '?' : ''}` : ''}${og?.you === colour ? ' (you)' : ''}`;
+    }
     return `${SIDE_NAME[colour]} · Player ${colour === 'w' ? 1 : 2}`;
   })();
   const toMove = !g.over && g.turn === colour;
@@ -183,6 +193,7 @@ function PlayerBar({ colour, where }: { colour: Colour; where: 'top' | 'bottom' 
         </div>
       </div>
       {toMove && kc.opponent === 'ai' && colour === aiColour() && thinking && <span className="k-thinking">thinking…</span>}
+      {away && <span className="k-away" title="Lost connection">away</span>}
       {g.timeControl && (
         <time className={`k-clock${toMove ? ' running' : ''}${left < 20_000 ? ' low' : ''}`} aria-label={`${SIDE_NAME[colour]} clock`}>
           {clockText(left)}
@@ -301,6 +312,9 @@ function GameMenu() {
   const g = kc.game;
   const close = () => useKingdom.setState({ showMenu: false });
   const canTakeback = kc.opponent === 'ai' && !g.timeControl && !g.over && g.history.some((m) => m.colour === kc.you);
+  const isOnline = kc.opponent === 'online';
+  const watching = isOnline && !kc.you;
+  const early = g.history.length < 2;
   return (
     <div className="k-scrim" onClick={close}>
       <section className="menu panel k-menu" role="dialog" aria-modal="true" aria-label="Game menu" onClick={(e) => e.stopPropagation()}>
@@ -310,12 +324,13 @@ function GameMenu() {
         </div>
         <div className="menu-actions col">
           {canTakeback && <button className="btn" onClick={() => { takeback(); close(); }}>↶ Take back my move</button>}
-          {!g.over && kc.opponent !== 'local' && <button className="btn" onClick={() => { offerDraw(); close(); }}>½ Offer a draw</button>}
+          {!g.over && !watching && kc.opponent !== 'local' && !(isOnline && early) && <button className="btn" onClick={() => { offerDraw(); close(); }}>½ Offer a draw</button>}
           {!g.over && kc.opponent === 'local' && <button className="btn" onClick={() => { offerDraw(); close(); }}>½ Agree a draw</button>}
-          {!g.over && <button className="btn" onClick={() => resign()}>⚑ Resign</button>}
+          {!g.over && !watching && <button className="btn" onClick={() => resign()}>{isOnline && early ? '✕ Call the game off (no rating change)' : '⚑ Resign'}</button>}
+          {isOnline && <OnlineMenuExtras close={close} />}
           <button className="btn" onClick={() => useKingdom.setState((x) => ({ viewFrom: x.viewFrom === 'w' ? 'b' : 'w' }))}>⟲ Turn the board around</button>
           <button className="btn" onClick={() => useKingdom.setState({ showHelp: true })}>? How each soldier moves</button>
-          <button className="btn" onClick={() => exitToHome()}>⌂ Leave to the main menu</button>
+          {!isOnline && <button className="btn" onClick={() => exitToHome()}>⌂ Leave to the main menu</button>}
         </div>
         <div className="setting">
           <span>Battle animations</span>

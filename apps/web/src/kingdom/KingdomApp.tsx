@@ -5,6 +5,7 @@ import { Settings } from '../hud/Settings';
 import { KingdomPerf } from './KingdomPerf';
 import { KingdomScene } from './KingdomScene';
 import { KingdomHud, syncDirectorSpeed } from './KingdomHud';
+import { openFromUrl } from './online';
 import './kingdom.css';
 
 export function KingdomApp() {
@@ -13,6 +14,8 @@ export function KingdomApp() {
   useEffect(() => {
     syncDirectorSpeed();
     document.title = 'ChessFront · The Living Chess Experience';
+    // An invite (?play=…) or spectator (?watch=…) link opens straight into online play.
+    openFromUrl();
   }, []);
   return (
     <div className="app kingdom">

@@ -43,7 +43,7 @@ const lastSnap = (inbox: ServerMessage[]) => [...inbox].reverse().find((m): m is
 
 describe('authoritative server', () => {
   it('seats two players, applies only their own orders, and filters snapshots by fog of war', async () => {
-    server = await startServer(0, { autoTick: false });
+    server = await startServer(0, { autoTick: false, online: false });
     const sun = client(server.port, 'room=duel&mode=pvp', 'sun');
     const moon = client(server.port, 'room=duel&mode=pvp', 'moon');
     await Promise.all([sun.ready, moon.ready]);

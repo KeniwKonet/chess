@@ -10,6 +10,7 @@ import { KingdomGame, ROLE_NAME, searchKingdom, TIME_CONTROLS, type Colour, type
 import { director } from './director';
 import { sfx, sound, unlockAudio } from './sound';
 import { toast, useKingdom, type Opponent } from './store';
+import { leaveOnlineGame, onlineDraw, onlineResign } from './online';
 
 const ANIM_SPEED = { cinematic: 1, quick: 2.2, off: 0 } as const;
 /** The computer never answers faster than this (s), so its moves can be followed. */
@@ -20,8 +21,8 @@ const AI_SLICE_MS = 7;
 export const kc = {
   game: new KingdomGame(),
   opponent: 'ai' as Opponent,
-  /** Colour(s) the person at this device plays. */
-  you: 'w' as Colour | 'both',
+  /** Colour(s) the person at this device plays; null when watching an online game. */
+  you: 'w' as Colour | 'both' | null,
   ai: null as null | { it: Generator<void, string | null>; started: number; result?: string | null },
   /** Real time (ms) of the game's clock reference. */
   clockNow: () => performance.now(),
@@ -35,6 +36,7 @@ const bump = () => useKingdom.setState((s) => ({ rev: s.rev + 1 }));
 export const canMove = (c: Colour) => !kc.game.over && kc.game.turn === c && (kc.you === 'both' || kc.you === c);
 export const humanToMove = () => canMove(kc.game.turn);
 export const aiColour = (): Colour | null => (kc.opponent === 'ai' ? (kc.you === 'w' ? 'b' : 'w') : null);
+export const online = () => kc.opponent === 'online';
 
 export function startGame(opts: { opponent: Opponent; side?: Colour | 'random'; tc?: string; level?: string; fen?: string }) {
   unlockAudio();
@@ -43,6 +45,7 @@ export function startGame(opts: { opponent: Opponent; side?: Colour | 'random'; 
   kc.game = new KingdomGame({ timeControl: tc, ...(opts.fen ? { fen: opts.fen } : {}) });
   kc.opponent = opts.opponent;
   kc.ai = null;
+  if (kc.opponent === 'online' || opts.opponent === 'online') leaveOnlineGame();
   kc.send = null;
   const side = opts.side ?? s.side;
   kc.you = opts.opponent === 'local' ? 'both' : side === 'random' ? (Math.random() < 0.5 ? 'w' : 'b') : side;
@@ -106,17 +109,14 @@ export function choosePromotion(role: Role | null) {
 
 /** Play a move for the side to move (a person at this device, or the computer). */
 export function play(m: MoveInput): boolean {
-  if (kc.send && humanToMove()) {
-    // Online: the server decides; the move arrives back through `applyRemote`.
-    kc.send(m);
-    useKingdom.setState({ selected: null, targets: [], card: null });
-    return true;
-  }
+  if (online() && !humanToMove()) return false;
   const r = kc.game.move(kc.game.turn, m, kc.clockNow());
   if (!r.ok) {
     toast(r.reason, 'warn');
     return false;
   }
+  // Online, the move shows at once and goes to the server, which checks it and runs the clocks.
+  if (online() && kc.send) kc.send({ from: r.move.from, to: r.move.to, ...(r.move.promotion ? { promotion: r.move.promotion as 'q' | 'r' | 'b' | 'n' } : {}) });
   afterMove();
   void director.play(r.move, kc.game.tracker).then(() => {
     if (kc.opponent === 'local' && useKingdom.getState().flipEachTurn && !kc.game.over) useKingdom.setState({ viewFrom: kc.game.turn });
@@ -130,7 +130,9 @@ function afterMove() {
   const g = kc.game;
   const last = g.history.at(-1)!;
   useKingdom.setState({ selected: null, targets: [], card: null });
-  if (g.result) finish();
+  // Online, the result comes from the server.
+  if (g.result && online()) bump();
+  else if (g.result) finish();
   else if (last.check) {
     const victim = last.colour === 'w' ? 'b' : 'w';
     if (kc.you === 'both' || kc.you === victim) toast('Check! Your King is under attack.', 'warn');
@@ -152,7 +154,12 @@ function finish() {
 export function resign() {
   const g = kc.game;
   if (g.over) return;
-  const c: Colour = kc.you === 'both' ? g.turn : kc.you;
+  if (online()) {
+    onlineResign();
+    useKingdom.setState({ showMenu: false });
+    return;
+  }
+  const c: Colour = kc.you === 'both' || !kc.you ? g.turn : kc.you;
   g.resign(c);
   useKingdom.setState({ showMenu: false });
   finish();
@@ -161,6 +168,11 @@ export function resign() {
 export function offerDraw() {
   const g = kc.game;
   if (g.over) return;
+  if (online()) {
+    onlineDraw();
+    toast('Draw offered.');
+    return;
+  }
   if (kc.opponent === 'ai') {
     // The computer accepts only when it is clearly worse or the board is bare.
     const ai = aiColour()!;
@@ -206,7 +218,8 @@ export function frame(dt: number) {
   director.update(dt);
   const g = kc.game;
   const now = kc.clockNow();
-  if (!g.over && g.checkTime(now)) finish();
+  // Online, only the server's clock decides a loss on time.
+  if (!online() && !g.over && g.checkTime(now)) finish();
 
   // Low-time ticking for the person at this device.
   if (g.timeControl && !g.over && humanToMove()) {
@@ -251,7 +264,9 @@ sound.on = useKingdom.getState().sound;
 
 export function exitToHome() {
   kc.ai = null;
+  if (online()) leaveOnlineGame();
   kc.send = null;
+  kc.opponent = 'ai';
   useKingdom.setState({ screen: 'home', showMenu: false, showResult: false, result: null, selected: null, targets: [], card: null, thinking: false });
 }
 

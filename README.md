@@ -48,6 +48,10 @@ http://localhost:5173/?server=ws://localhost:8787/%3Froom%3Dashen%26mode%3Dai%26
 http://localhost:5173/?server=ws://localhost:8787/%3Froom%3Dduel%26mode%3Dpvp     # two players, two browsers
 ```
 
+## Online play
+
+Play online: make an account (or play as a guest), invite a friend by link or get paired, earn a rating, and watch live games. The game is a static site; online play needs the server in `apps/server` running somewhere that keeps it running (see [docs/ONLINE.md](docs/ONLINE.md) for setup, hosting and the API). Locally, `npm run server` starts it and the game finds it by itself.
+
 ## Layout
 
 ```
