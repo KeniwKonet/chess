@@ -9,6 +9,7 @@ import type { ClientMsg, ServerMsg, TournamentDetail } from '@cr/chess-core';
 import { startServer, type ServerHandle } from '../src/server';
 import { bracketOrder } from '../src/online/tournaments';
 import type { Mail } from '../src/online/mailer';
+import { testDb } from './pg';
 
 let server: ServerHandle | null = null;
 let clock = 1_000_000;
@@ -29,7 +30,7 @@ async function boot() {
   clock = 1_000_000;
   server = await startServer(0, {
     autoTick: false,
-    dataDir: 'memory://',
+    ...(await testDb('memory://')),
     hub: { now: () => clock, timers: false, log: () => {} },
     mailer: async (m) => void mails.push(m),
     roundBreakMs: 0,
@@ -248,7 +249,12 @@ describe('admin and safety', () => {
       sb.send({ t: 'resign', code });
       await sa.wait('end', (m) => m.code === code);
     }
-    const flags = (await call('/api/admin/flags', boss.token)).body.flags;
+    // The checks run just after the players hear the result; give them a moment.
+    let flags: any[] = [];
+    for (let i = 0; i < 40 && flags.length < 2; i++) {
+      flags = (await call('/api/admin/flags', boss.token)).body.flags;
+      if (flags.length < 2) await new Promise((r) => setTimeout(r, 50));
+    }
     expect(flags.map((f: any) => `${f.name}:${f.kind}`).sort()).toEqual(['Ada:win-trading', 'Bram:win-trading']);
   });
 });
