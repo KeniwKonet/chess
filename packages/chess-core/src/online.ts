@@ -46,6 +46,37 @@ export interface PublicUser {
   ratings: Record<RatingCategory, Rating>;
   /** Games, wins, losses, draws (all finished online games). */
   record?: { games: number; wins: number; losses: number; draws: number; streak: number; bestStreak: number };
+  bio?: string;
+  /** ISO 3166 two-letter country code, or ''. */
+  country?: string;
+  /** Path of the profile picture on the server, or null. */
+  avatar?: string | null;
+  admin?: boolean;
+  joined?: number;
+  /** Only in your own account. */
+  email?: string | null;
+}
+
+export interface Notification {
+  id: number;
+  kind: 'friend-request' | 'friend' | 'challenge' | 'cluster' | 'tournament' | 'announcement' | 'account';
+  text: string;
+  /** What the notification links to, e.g. { code } for a game or { tournament } for a tournament. */
+  data: Record<string, unknown>;
+  read: boolean;
+  at: number;
+}
+
+export interface FriendInfo {
+  id: number;
+  name: string;
+  /** friend, or a request you sent / received. */
+  status: 'friend' | 'sent' | 'received';
+  online: boolean;
+  rating: number;
+  avatar: string | null;
+  /** Your score against them. */
+  h2h: HeadToHead;
 }
 
 export interface HeadToHead {
@@ -130,6 +161,7 @@ export interface GameRecord {
 export type ClientMsg =
   | ClashMsg
   | { t: 'auth'; token: string }
+  | { t: 'challenge'; to: string; tc: OnlineTc; colour: Colour | 'random'; rated: boolean }
   | { t: 'invite'; tc: OnlineTc; colour: Colour | 'random'; rated: boolean }
   | { t: 'seek'; tc: OnlineTc; rated: boolean }
   | { t: 'cancel' }
@@ -148,7 +180,9 @@ export type ClientMsg =
 /* Server -> browser */
 export type ServerMsg =
   | ClashServerMsg
-  | { t: 'ready'; user: PublicUser }
+  | { t: 'ready'; user: PublicUser; unread?: number }
+  | { t: 'notify'; note: Notification }
+  | { t: 'tournament-game'; tournament: string; code: string }
   | { t: 'invited'; code: string }
   | { t: 'seeking'; tc: OnlineTc; rated: boolean; waiting: number }
   | { t: 'cancelled' }
@@ -339,3 +373,61 @@ export type ClashServerMsg =
   | { t: 'clash'; clash: ClashView }
   | { t: 'clash-created'; code: string }
   | { t: 'clash-challenges'; open: { code: string; from: string; fromRating: number; turnSecs: number; target: string | null }[]; live: { code: string; white: string; black: string; moves: number }[] };
+
+/* ---------------------------------------------------------------- tournaments */
+
+export type TournamentKind = 'swiss' | 'knockout';
+export type TournamentStatus = 'open' | 'running' | 'finished' | 'cancelled';
+
+export interface TournamentSummary {
+  slug: string;
+  name: string;
+  kind: TournamentKind;
+  tc: OnlineTc;
+  rated: boolean;
+  status: TournamentStatus;
+  players: number;
+  maxPlayers: number;
+  rounds: number;
+  currentRound: number;
+  startsAt: number | null;
+  createdBy: string | null;
+  featured: boolean;
+  winner: string | null;
+}
+
+export interface StandingRow {
+  rank: number;
+  id: number;
+  name: string;
+  rating: number;
+  score: number;
+  /** Sum of opponents' scores (Swiss tiebreak). */
+  buchholz: number;
+  /** Sonneborn-Berger tiebreak. */
+  sb: number;
+  wins: number;
+  played: number;
+  withdrawn: boolean;
+  eliminated: boolean;
+}
+
+export interface TournamentGame {
+  board: number;
+  /** 0 for the game itself; 1, 2 … for replays after a draw in a knockout. */
+  replay: number;
+  white: { id: number; name: string } | null;
+  black: { id: number; name: string } | null;
+  /** '1-0', '0-1', '1/2', 'bye', or null while in play. */
+  result: string | null;
+  reason: string | null;
+  code: string | null;
+}
+
+export interface TournamentDetail extends TournamentSummary {
+  description: string;
+  standings: StandingRow[];
+  /** Every round's games. */
+  schedule: { round: number; games: TournamentGame[] }[];
+  you: { joined: boolean; creator: boolean; admin: boolean; game: string | null } | null;
+}

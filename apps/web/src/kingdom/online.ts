@@ -27,6 +27,7 @@ import { kc } from './controller';
 import { sfx } from './sound';
 import { toast, useKingdom } from './store';
 import { handleClash, openClash, useClusters } from './clash';
+import { loadFriends, loadNotes, onNote, openTournament, useSocial } from './social';
 
 export const ONLINE_BASE = (() => {
   if (typeof location === 'undefined') return 'http://localhost:8787';
@@ -166,7 +167,7 @@ async function signIn(path: string, body: unknown) {
 export const playAsGuest = () => signIn('/api/guest', {});
 export const login = (name: string, password: string) => signIn('/api/login', { name, password });
 /** Creates an account; a guest keeps their games. */
-export const register = (name: string, password: string) => signIn('/api/register', { name, password });
+export const register = (name: string, password: string, email?: string) => signIn('/api/register', { name, password, ...(email ? { email } : {}) });
 
 export async function logout() {
   await api('/api/logout', {}).catch(() => {});
@@ -278,6 +279,9 @@ function handle(m: ServerMsg) {
     case 'ready': {
       authed = true;
       useOnline.setState({ user: m.user });
+      useSocial.setState({ unread: m.unread ?? 0 });
+      void loadNotes();
+      void loadFriends();
       // Back in a game after a dropped connection: ask for it again.
       const g = s.game;
       if (g && g.status === 'playing') outbox.unshift({ t: g.you ? 'join' : 'watch', code: g.code });
@@ -353,6 +357,12 @@ function handle(m: ServerMsg) {
       toast(m.message, 'warn');
       return;
     case 'pong':
+      return;
+    case 'notify':
+      return onNote(m.note);
+    case 'tournament-game':
+      // The game itself arrives as a 'game' message and opens the board.
+      toast('Your tournament game has started. Good luck!', 'good');
       return;
     case 'clash':
     case 'clash-created':
@@ -584,6 +594,12 @@ export function openFromUrl(): boolean {
   const play = q.get('play');
   const watch = q.get('watch');
   const clash = q.get('clash');
+  const tour = q.get('t');
+  if (tour) {
+    if (useOnline.getState().token) openSocket();
+    void openTournament(tour);
+    return true;
+  }
   if (clash) {
     useKingdom.setState({ screen: 'clusters' });
     openClash(clash);

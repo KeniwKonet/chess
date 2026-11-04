@@ -9,7 +9,8 @@
     "server": "npm run start -w @cr/server",
     "assets": "node tools/build-assets.mjs",
     "test": "vitest run",
-    "typecheck": "npm exec --workspaces -- tsc --noEmit"
+    "typecheck": "npm exec --workspaces -- tsc --noEmit",
+    "start": "npm run start -w @cr/server"
   },
   "devDependencies": {
     "@gltf-transform/core": "4.5.1",

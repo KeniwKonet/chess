@@ -31,20 +31,36 @@ export interface UserRow {
   draws: number;
   streak: number;
   best_streak: number;
+  is_admin: boolean;
+  banned_until: string | Date | null;
+  ban_reason: string | null;
+  deleted: boolean;
+  bio: string;
+  country: string;
+  avatar_ver: number;
+  email: string | null;
+  created_at: string | Date;
 }
+
+const USER_COLS = 'id, name, guest, games, wins, losses, draws, streak, best_streak, is_admin, banned_until, ban_reason, deleted, bio, country, avatar_ver, email, created_at';
+/** Sessions end after this long without use. */
+const SESSION_IDLE_DAYS = 90;
+/** Names given admin rights (comma-separated ADMIN_NAMES). */
+export const adminNames = () => new Set((process.env.ADMIN_NAMES ?? '').split(',').map((s) => s.trim().toLowerCase()).filter(Boolean));
+export const isBanned = (u: Pick<UserRow, 'banned_until'>) => !!u.banned_until && new Date(u.banned_until).getTime() > Date.now();
 
 const CATEGORIES: RatingCategory[] = ['blitz', 'rapid'];
 const RESERVED = new Set(['admin', 'administrator', 'chessfront', 'moderator', 'support', 'system', 'guest', 'anonymous', 'computer']);
 
-const sha = (s: string) => createHash('sha256').update(s).digest('hex');
+export const sha = (s: string) => createHash('sha256').update(s).digest('hex');
 
-async function hashPassword(pw: string): Promise<string> {
+export async function hashPassword(pw: string): Promise<string> {
   const salt = randomBytes(16);
   const key = await scrypt(pw, salt, 32);
   return `scrypt$${salt.toString('base64')}$${key.toString('base64')}`;
 }
 
-async function checkPassword(pw: string, stored: string): Promise<boolean> {
+export async function checkPassword(pw: string, stored: string): Promise<boolean> {
   const [kind, salt, key] = stored.split('$');
   if (kind !== 'scrypt' || !salt || !key) return false;
   const want = Buffer.from(key, 'base64');
@@ -59,7 +75,7 @@ export function checkName(name: unknown): string {
   return name;
 }
 
-function checkNewPassword(pw: unknown): string {
+export function checkNewPassword(pw: unknown): string {
   if (typeof pw !== 'string' || pw.length < PASSWORD_MIN) throw new AuthError(`Passwords need at least ${PASSWORD_MIN} characters.`);
   if (pw.length > 200) throw new AuthError('That password is too long.');
   return pw;
@@ -68,7 +84,7 @@ function checkNewPassword(pw: unknown): string {
 export class Accounts {
   constructor(private db: Db) {}
 
-  private async newSession(userId: number): Promise<string> {
+  async newSession(userId: number): Promise<string> {
     const token = randomBytes(32).toString('base64url');
     await this.db.query('insert into sessions(token_hash, user_id) values ($1, $2)', [sha(token), userId]);
     return token;
@@ -89,15 +105,23 @@ export class Accounts {
       const rows = await this.db.query<{ id: number }>('insert into users(name, name_key, pass_hash) values ($1, $2, $3) returning id', [n, n.toLowerCase(), pw]);
       id = rows[0]!.id;
     }
+    if (adminNames().has(n.toLowerCase())) await this.db.query('update users set is_admin = true where id = $1', [id]);
     return { token: await this.newSession(id), user: (await this.publicUser(id))! };
   }
 
   async login(name: unknown, password: unknown): Promise<{ token: string; user: PublicUser }> {
     if (typeof name !== 'string' || typeof password !== 'string') throw new AuthError('Enter your name and password.');
-    const rows = await this.db.query<{ id: number; pass_hash: string | null }>('select id, pass_hash from users where name_key = $1', [name.toLowerCase()]);
+    // Sign in with your name or your email.
+    const key = name.trim().toLowerCase();
+    const rows = await this.db.query<{ id: number; pass_hash: string | null; banned_until: string | null; ban_reason: string | null; deleted: boolean }>(
+      'select id, pass_hash, banned_until, ban_reason, deleted from users where name_key = $1 or email_key = $1 limit 1',
+      [key],
+    );
     const row = rows[0];
     const ok = row?.pass_hash ? await checkPassword(password, row.pass_hash) : (await hashPassword('timing-equaliser'), false);
-    if (!row || !ok) throw new AuthError('That name and password do not match.', 401);
+    if (!row || !ok || row.deleted) throw new AuthError('That name and password do not match.', 401);
+    if (isBanned(row)) throw new AuthError(`This account is suspended until ${new Date(row.banned_until!).toUTCString()}${row.ban_reason ? `: ${row.ban_reason}` : ''}.`, 403);
+    if (adminNames().has(key)) await this.db.query('update users set is_admin = true where id = $1', [row.id]);
     return { token: await this.newSession(row.id), user: (await this.publicUser(row.id))! };
   }
 
@@ -117,18 +141,25 @@ export class Accounts {
   /** The user a token belongs to, or null. */
   async fromToken(token: string | null | undefined): Promise<UserRow | null> {
     if (!token || token.length > 100) return null;
-    const rows = await this.db.query<{ user_id: number }>('update sessions set last_seen = now() where token_hash = $1 returning user_id', [sha(token)]);
+    const rows = await this.db.query<{ user_id: number }>(
+      `update sessions set last_seen = now() where token_hash = $1 and last_seen > now() - interval '${SESSION_IDLE_DAYS} days' returning user_id`,
+      [sha(token)],
+    );
     const uid = rows[0]?.user_id;
-    return uid ? this.user(uid) : null;
+    if (!uid) return null;
+    const u = await this.user(uid);
+    // Suspended and deleted accounts are signed out.
+    if (!u || u.deleted || isBanned(u)) return null;
+    return u;
   }
 
   async user(id: number): Promise<UserRow | null> {
-    const rows = await this.db.query<UserRow>('select id, name, guest, games, wins, losses, draws, streak, best_streak from users where id = $1', [id]);
+    const rows = await this.db.query<UserRow>(`select ${USER_COLS} from users where id = $1`, [id]);
     return rows[0] ?? null;
   }
 
   async byName(name: string): Promise<UserRow | null> {
-    const rows = await this.db.query<UserRow>('select id, name, guest, games, wins, losses, draws, streak, best_streak from users where name_key = $1', [name.toLowerCase()]);
+    const rows = await this.db.query<UserRow>(`select ${USER_COLS} from users where name_key = $1 and deleted = false`, [name.toLowerCase()]);
     return rows[0] ?? null;
   }
 
@@ -157,7 +188,18 @@ export class Accounts {
   async publicUser(id: number): Promise<PublicUser | null> {
     const u = await this.user(id);
     if (!u) return null;
-    return { id: u.id, name: u.name, guest: u.guest, ratings: await this.ratings(id), record: { games: u.games, wins: u.wins, losses: u.losses, draws: u.draws, streak: u.streak, bestStreak: u.best_streak } };
+    return {
+      id: u.id,
+      name: u.name,
+      guest: u.guest,
+      ratings: await this.ratings(id),
+      record: { games: u.games, wins: u.wins, losses: u.losses, draws: u.draws, streak: u.streak, bestStreak: u.best_streak },
+      bio: u.bio,
+      country: u.country,
+      avatar: u.avatar_ver ? `/api/avatars/${u.id}?v=${u.avatar_ver}` : null,
+      ...(u.is_admin ? { admin: true } : {}),
+      joined: new Date(u.created_at).getTime(),
+    };
   }
 
   /** Results between two players (finished online games), from `a`'s side. */
