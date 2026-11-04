@@ -8,7 +8,7 @@
  */
 import { createServer } from 'node:http';
 import { WebSocketServer, type WebSocket } from 'ws';
-import { startOnline, type Online } from './online';
+import { startOnline, type Online, type OnlineOptions } from './online';
 import type { HubOptions } from './online/hub';
 import type { ClientMessage, ServerMessage } from '@cr/match';
 import type { Difficulty, Side } from '@cr/game-core';
@@ -29,6 +29,8 @@ export interface ServerOptions {
   dbUrl?: string;
   dataDir?: string;
   hub?: HubOptions;
+  mailer?: OnlineOptions['mailer'];
+  roundBreakMs?: number;
 }
 
 const DIFFS = new Set(['recruit', 'captain', 'warlord']);
@@ -41,7 +43,7 @@ export async function startServer(port = 0, opts: ServerOptions = {}): Promise<S
     res.writeHead(200, { 'content-type': 'text/plain' });
     res.end('ChessFront server. The game lives at https://chessfront.app\n');
   });
-  const online = opts.online === false ? null : await startOnline(http, { dbUrl: opts.dbUrl, dataDir: opts.dataDir, hub: opts.hub });
+  const online = opts.online === false ? null : await startOnline(http, { dbUrl: opts.dbUrl, dataDir: opts.dataDir, hub: opts.hub, mailer: opts.mailer, roundBreakMs: opts.roundBreakMs });
   const wss = new WebSocketServer({ noServer: true, maxPayload: MAX_MESSAGE });
   http.on('upgrade', (req, socket, head) => {
     if ((req.url ?? '/').split('?')[0] === '/online' && online) return; // handled by online play

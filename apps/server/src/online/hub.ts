@@ -28,6 +28,7 @@ import type { Accounts, UserRow } from './accounts';
 import type { Db } from './db';
 import { ClashHub } from './clash';
 import type { Clusters } from './clusters';
+import type { Friends, Notifier } from './social';
 import { PROVISIONAL_RD, rate } from './glicko';
 
 const CODE_ALPHABET = 'abcdefghjkmnpqrstuvwxyz23456789';
@@ -70,7 +71,24 @@ interface Live {
   ratingChange?: RatingChange;
   saving: Promise<unknown>;
   idleSince: number | null;
+  /** The tournament this game belongs to (its slug), if any. */
+  tournament?: string;
+  /** Who failed to make their first move (when the game was called off for that). */
+  noShow?: Colour;
 }
+
+/** Told about every finished or called-off game. */
+export type GameEndListener = (e: {
+  code: string;
+  white: number | null;
+  black: number | null;
+  rated: boolean;
+  status: 'over' | 'aborted';
+  winner: Colour | null;
+  reason: string;
+  noShow?: Colour;
+  tournament?: string;
+}) => void | Promise<void>;
 
 export interface HubOptions {
   /** Clock source (ms); tests pass a fake one. */
@@ -93,6 +111,9 @@ export class Hub {
   private log: (...a: unknown[]) => void;
   private sweeper: NodeJS.Timeout | null = null;
   readonly clash: ClashHub | null = null;
+  readonly endListeners: GameEndListener[] = [];
+  notifier: Notifier | null = null;
+  friends: Friends | null = null;
 
   constructor(
     private db: Db,
@@ -183,7 +204,8 @@ export class Hub {
       const u = await this.accounts.fromToken(msg.token);
       if (!u) return c.send({ t: 'error', message: 'Please sign in again.', code: 'auth' });
       c.user = u;
-      return c.send({ t: 'ready', user: (await this.accounts.publicUser(u.id))! });
+      const unread = this.notifier ? (await this.notifier.list(u.id)).unread : 0;
+      return c.send({ t: 'ready', user: (await this.accounts.publicUser(u.id))!, unread });
     }
     if (msg.t === 'watch') return this.attach(c, String(msg.code), false);
     if (msg.t.startsWith('clash-')) {
@@ -217,12 +239,14 @@ export class Hub {
         return this.move(c, msg.code, msg.ply, msg.move);
       case 'resign':
         return this.act(c, msg.code, (g, seat) => {
-          if (g.game!.history.length < 2) return this.finish(g, 'aborted', null, 'aborted');
+          // In a tournament, resigning always counts.
+          if (g.game!.history.length < 2 && !g.tournament) return this.finish(g, 'aborted', null, 'aborted');
           g.game!.resign(seat);
           return this.finish(g, 'over');
         });
       case 'abort':
         return this.act(c, msg.code, (g) => {
+          if (g.tournament) return c.send({ t: 'error', message: 'Tournament games can’t be called off. You can resign.' });
           if (g.game!.history.length >= 2) return c.send({ t: 'error', message: 'Too late to call it off. You can resign or offer a draw.' });
           return this.finish(g, 'aborted', null, 'aborted');
         });
@@ -243,12 +267,67 @@ export class Hub {
           const away = g.awaySince[opp];
           if (away === undefined || this.seatConnected(g, opp) || this.now() - away < ONLINE_TIMING.abandon)
             return c.send({ t: 'error', message: 'Your opponent can still come back.' });
-          if (g.game!.history.length < 2) return this.finish(g, 'aborted', null, 'aborted');
+          if (g.game!.history.length < 2) {
+            g.noShow = opp;
+            return this.finish(g, 'aborted', null, 'aborted');
+          }
           return this.finish(g, 'over', seat, 'abandoned');
         });
       case 'rematch':
         return this.rematch(c, msg.code);
+      case 'challenge':
+        return this.challenge(c, msg);
     }
+  }
+
+  /** Challenge a friend directly: an invite whose link goes to them as a notification. */
+  private async challenge(c: Conn, msg: Extract<ClientMsg, { t: 'challenge' }>) {
+    const me = c.user!;
+    const them = typeof msg.to === 'string' ? await this.accounts.byName(msg.to) : null;
+    if (!them) return c.send({ t: 'error', message: 'No player with that name.' });
+    if (!this.friends || !(await this.friends.areFriends(me.id, them.id))) return c.send({ t: 'error', message: 'You can challenge your friends directly. Send them an invite link instead.' });
+    await this.invite(c, msg.tc, msg.colour, !!msg.rated);
+    const code = [...this.games.values()].reverse().find((g) => g.status === 'waiting' && g.creator.id === me.id)?.code;
+    if (!code) return;
+    const tc = msg.tc === 'untimed' ? 'an untimed' : `a ${msg.tc}`;
+    await this.notifier?.notify(them.id, 'challenge', `${me.name} challenges you to ${tc} game.`, { code, from: me.name });
+  }
+
+  /** Start a game between two players right away (tournaments). Takes them to it if they are online. */
+  async arrange(whiteId: number, blackId: number, tc: OnlineTc, rated: boolean, tournament: string): Promise<string> {
+    const wu = await this.accounts.user(whiteId);
+    const bu = await this.accounts.user(blackId);
+    if (!wu || !bu) throw new Error('missing player');
+    const ws = await this.seat(wu, tc);
+    const bs = await this.seat(bu, tc);
+    const g = this.blank(newCode(), tc, rated && !wu.guest && !bu.guest && !!ratingCategory(tc), ws, 'w');
+    g.tournament = tournament;
+    g.seats = { w: ws, b: bs };
+    this.games.set(g.code, g);
+    const conns = [...this.connsOf(whiteId), ...this.connsOf(blackId)];
+    for (const c of conns) this.unseek(c);
+    await this.start(g, conns);
+    for (const c of conns) c.send({ t: 'tournament-game', tournament, code: g.code });
+    return g.code;
+  }
+
+  /** Signs a user out of every open connection (suspensions). */
+  kick(userId: number) {
+    for (const c of this.connsOf(userId)) {
+      c.send({ t: 'error', message: 'This account has been suspended.', code: 'auth' });
+      this.disconnect(c);
+      c.user = null;
+    }
+  }
+
+  /** A message to everyone online. Returns how many connections it reached. */
+  announce(text: string): number {
+    let n = 0;
+    for (const c of this.conns) {
+      c.send({ t: 'notify', note: { id: 0, kind: 'announcement', text, data: {}, read: false, at: this.now() } });
+      n++;
+    }
+    return n;
   }
 
   /* ---------- starting games ---------- */
@@ -456,7 +535,11 @@ export class Hub {
       if (g.status !== 'playing' || !g.game) continue;
       if (this.flagCheck(g)) continue;
       const deadline = this.firstMoveDeadline(g);
-      if (deadline !== null && this.now() >= deadline) void this.finish(g, 'aborted', null, 'aborted');
+      if (deadline !== null && this.now() >= deadline) {
+        // Whoever was to make their first move didn't.
+        g.noShow = g.game.history.length === 0 ? 'w' : 'b';
+        void this.finish(g, 'aborted', null, 'aborted');
+      }
       else this.schedule(g);
     }
   }
@@ -504,6 +587,20 @@ export class Hub {
       };
     }
     this.broadcast(g, { t: 'end', code: g.code, result, status, ...(g.ratingChange ? { ratingChange: g.ratingChange } : {}), ...extra });
+    for (const l of this.endListeners)
+      await Promise.resolve(
+        l({
+          code: g.code,
+          white: g.seats.w?.id ?? null,
+          black: g.seats.b?.id ?? null,
+          rated: g.rated,
+          status,
+          winner: result.winner,
+          reason: result.reason,
+          ...(g.noShow ? { noShow: g.noShow } : {}),
+          ...(g.tournament ? { tournament: g.tournament } : {}),
+        }),
+      ).catch((e) => this.log('game end listener failed', e));
   }
 
   private async recordResult(g: Live, winner: Colour | null) {
@@ -682,13 +779,14 @@ export class Hub {
       g.startedAt ? new Date(g.startedAt) : null,
       g.status === 'over' || g.status === 'aborted' ? new Date(this.now()) : null,
       new Date(g.createdAt),
+      g.tournament ?? null,
     ];
     g.saving = g.saving
       .then(() =>
         this.db.query(
           `insert into games(code, tc, rated, status, white, black, creator, creator_colour, moves, clock_w, clock_b, winner, reason,
-             white_before, white_after, black_before, black_after, started_at, ended_at, created_at)
-           values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20)
+             white_before, white_after, black_before, black_after, started_at, ended_at, created_at, tournament)
+           values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21)
            on conflict (code) do update set status=$4, white=$5, black=$6, moves=$9, clock_w=$10, clock_b=$11, winner=$12, reason=$13,
              white_before=$14, white_after=$15, black_before=$16, black_after=$17, started_at=$18, ended_at=$19`,
           params,
@@ -702,6 +800,7 @@ export class Hub {
     const tc = r.tc as OnlineTc;
     const creator = await this.seatFromId(r.creator, tc);
     const g = this.blank(r.code, tc, r.rated, creator, (r.creator_colour ?? 'random') as Colour | 'random');
+    if (r.tournament) g.tournament = r.tournament;
     g.createdAt = new Date(r.created_at).getTime();
     g.status = r.status as GameStatus;
     if (r.white) g.seats.w = await this.seatFromId(r.white, tc);
@@ -771,4 +870,5 @@ export interface GameRow {
   created_at: string | Date;
   started_at: string | Date | null;
   ended_at: string | Date | null;
+  tournament?: string | null;
 }
