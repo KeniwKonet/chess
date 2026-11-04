@@ -33,8 +33,10 @@ export const ONLINE_BASE = (() => {
   if (typeof location === 'undefined') return 'http://localhost:8787';
   const q = new URLSearchParams(location.search).get('online');
   if (q && /^https?:\/\//.test(q)) return q.replace(/\/$/, '');
-  if (/^(localhost|127\.|192\.168\.|10\.)/.test(location.hostname)) return `http://${location.hostname}:8787`;
-  return 'https://api.chessfront.app';
+  // During development the game (Vite) and the server run on different ports.
+  if (/^(localhost|127\.|192\.168\.|10\.)/.test(location.hostname) && location.port !== '8787') return `http://${location.hostname}:8787`;
+  // In production one server serves both the game and online play, so it is the same site.
+  return location.origin;
 })();
 const WS_URL = `${ONLINE_BASE.replace(/^http/, 'ws')}/online`;
 const TOKEN_KEY = 'cf-token';
