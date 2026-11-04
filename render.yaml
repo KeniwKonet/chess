@@ -17,5 +17,3 @@ services:
         sync: false
       - key: ADMIN_NAMES # e.g. Kenneth
         sync: false
-      - key: ALLOWED_ORIGINS
-        value: https://chessfront.app,https://www.chessfront.app,https://api.chessfront.app
