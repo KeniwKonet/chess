@@ -1,18 +1,21 @@
-# Render Blueprint: the ChessFront server plus a Postgres database.
-# In Render: New → Blueprint → pick this repo. Then point api.chessfront.app at the service.
+# Render Blueprint: the ChessFront server (online play, clusters, tournaments).
+# In Render: New → Blueprint → pick this repo. It asks for the two secret values below.
+# Then add the custom domain api.chessfront.app (Settings → Custom Domains) and point DNS at it.
 services:
   - type: web
     name: chessfront-server
-    runtime: docker
-    plan: starter
+    runtime: node
+    plan: free # "starter" keeps it awake all the time; free sleeps after 15 idle minutes
+    region: frankfurt
+    buildCommand: npm ci --include=dev && npm run build
+    startCommand: npm start
     healthCheckPath: /health
     envVars:
-      - key: DATABASE_URL
-        fromDatabase:
-          name: chessfront-db
-          property: connectionString
-    domains:
-      - api.chessfront.app
-databases:
-  - name: chessfront-db
-    plan: basic-256mb
+      - key: NODE_VERSION
+        value: "22"
+      - key: DATABASE_URL # the Supabase "Session pooler" connection string, with your password in it
+        sync: false
+      - key: ADMIN_NAMES # e.g. Kenneth
+        sync: false
+      - key: ALLOWED_ORIGINS
+        value: https://chessfront.app,https://www.chessfront.app,https://api.chessfront.app
