@@ -433,7 +433,7 @@ export function OnlineBanner() {
   if (g.status === 'playing' && opp && g.drawOffer === opp)
     items.push(
       <div key="draw" className="k-banner" role="alert">
-        Your opponent offers a draw.
+        <span className="k-banner-text">Your opponent offers a draw.</span>
         <button className="btn btn-primary" onClick={onlineDraw}>Accept</button>
         <button className="btn" onClick={onlineDecline}>Decline</button>
       </div>,
