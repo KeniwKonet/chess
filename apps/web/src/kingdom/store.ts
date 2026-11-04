@@ -2,7 +2,7 @@
 import { create } from 'zustand';
 import type { AiLevel, Colour, KingdomResult, Role } from '@cr/chess-core';
 
-export type Opponent = 'ai' | 'local' | 'online';
+export type Opponent = 'ai' | 'local' | 'online' | 'clash';
 export type AnimSpeed = 'cinematic' | 'quick' | 'off';
 
 const saved = (() => {
@@ -14,7 +14,7 @@ const saved = (() => {
 })();
 
 export interface KState {
-  screen: 'home' | 'setup' | 'online' | 'playing';
+  screen: 'home' | 'setup' | 'online' | 'clusters' | 'playing';
   opponent: Opponent;
   aiLevel: AiLevel;
   side: Colour | 'random';

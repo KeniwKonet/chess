@@ -45,7 +45,13 @@ export interface PublicUser {
   guest: boolean;
   ratings: Record<RatingCategory, Rating>;
   /** Games, wins, losses, draws (all finished online games). */
-  record?: { games: number; wins: number; losses: number; draws: number };
+  record?: { games: number; wins: number; losses: number; draws: number; streak: number; bestStreak: number };
+}
+
+export interface HeadToHead {
+  wins: number;
+  losses: number;
+  draws: number;
 }
 
 export interface SeatInfo {
@@ -122,6 +128,7 @@ export interface GameRecord {
 
 /* Browser -> server */
 export type ClientMsg =
+  | ClashMsg
   | { t: 'auth'; token: string }
   | { t: 'invite'; tc: OnlineTc; colour: Colour | 'random'; rated: boolean }
   | { t: 'seek'; tc: OnlineTc; rated: boolean }
@@ -140,13 +147,24 @@ export type ClientMsg =
 
 /* Server -> browser */
 export type ServerMsg =
+  | ClashServerMsg
   | { t: 'ready'; user: PublicUser }
   | { t: 'invited'; code: string }
   | { t: 'seeking'; tc: OnlineTc; rated: boolean; waiting: number }
   | { t: 'cancelled' }
   | { t: 'game'; game: GameView }
   | { t: 'move'; code: string; ply: number; san: string; clocks: Record<Colour, number> | null; running: Colour | null; serverNow: number }
-  | { t: 'end'; code: string; result: { winner: Colour | null; reason: string }; status: GameStatus; ratingChange?: Record<Colour, { before: number; after: number }> }
+  | {
+      t: 'end';
+      code: string;
+      result: { winner: Colour | null; reason: string };
+      status: GameStatus;
+      ratingChange?: Record<Colour, { before: number; after: number }>;
+      /** Each player's win streak after this game. */
+      streaks?: Record<Colour, number>;
+      /** All finished games between these two, from White's side. */
+      h2h?: HeadToHead;
+    }
   | { t: 'offer'; code: string; drawOffer: Colour | null }
   | { t: 'presence'; code: string; presence: Presence }
   | { t: 'rematch'; code: string; by: Colour | null; next?: string }
@@ -180,3 +198,144 @@ export const onlineResultText = (reason: string, winner: Colour | null, names: R
       return winner ? `${w} wins.` : 'A draw.';
   }
 };
+
+/* ---------------------------------------------------------------- clusters */
+
+/**
+ * A cluster is a team that fights as one army: each member holds a chess role
+ * and moves that piece in a Clash of Clusters. Sixteen roles make a full army.
+ */
+export const CLUSTER_ROLES = ['k', 'q', 'r1', 'r2', 'b1', 'b2', 'n1', 'n2', 'p1', 'p2', 'p3', 'p4', 'p5', 'p6', 'p7', 'p8'] as const;
+export type ClusterRole = (typeof CLUSTER_ROLES)[number];
+export type MemberStatus = 'member' | 'sub' | 'spectator' | 'pending';
+
+const ROLE_FILE: Record<ClusterRole, string> = {
+  k: 'e', q: 'd', r1: 'a', r2: 'h', b1: 'c', b2: 'f', n1: 'b', n2: 'g',
+  p1: 'a', p2: 'b', p3: 'c', p4: 'd', p5: 'e', p6: 'f', p7: 'g', p8: 'h',
+};
+
+/** Starting square of a role's piece for a side. */
+export const roleSquare = (role: ClusterRole, colour: Colour): string => `${ROLE_FILE[role]}${role.startsWith('p') ? (colour === 'w' ? 2 : 7) : colour === 'w' ? 1 : 8}`;
+
+/** The PieceTracker id of a role's piece (stable through the game, even after promotion). */
+export const rolePieceId = (role: ClusterRole, colour: Colour): string => `${colour}-${role[0] === 'k' ? 'k' : role[0]}-${roleSquare(role, colour)}`;
+
+/** The role whose piece has this tracker id. */
+export const roleOfPieceId = (id: string): ClusterRole | null => {
+  const [, , sq] = id.split('-');
+  if (!sq) return null;
+  return CLUSTER_ROLES.find((r) => roleSquare(r, id[0] as Colour) === sq) ?? null;
+};
+
+export const ROLE_TITLE: Record<ClusterRole, string> = {
+  k: 'King', q: 'Sorceress', r1: 'Siege Tower (a)', r2: 'Siege Tower (h)', b1: 'Ranger (c)', b2: 'Ranger (f)', n1: 'Raider (b)', n2: 'Raider (g)',
+  p1: 'Footman (a)', p2: 'Footman (b)', p3: 'Footman (c)', p4: 'Footman (d)', p5: 'Footman (e)', p6: 'Footman (f)', p7: 'Footman (g)', p8: 'Footman (h)',
+};
+
+export interface ClusterMember {
+  id: number;
+  name: string;
+  status: MemberStatus;
+  role: ClusterRole | null;
+  /** Best of the member's Blitz and Rapid ratings. */
+  rating: number;
+  online?: boolean;
+}
+
+export interface ClusterSummary {
+  id: number;
+  name: string;
+  motto: string;
+  king: string;
+  members: number;
+  /** Joint power: the sum of the members' ratings. */
+  power: number;
+  rating: number;
+  provisional: boolean;
+  record: { clashes: number; wins: number; losses: number; draws: number };
+}
+
+export interface ClusterDetail extends ClusterSummary {
+  roster: ClusterMember[];
+  /** Your place in this cluster, if any. */
+  you: { status: MemberStatus; role: ClusterRole | null; king: boolean } | null;
+  recent: ClashRecord[];
+}
+
+export interface ClashRecord {
+  code: string;
+  white: string | null;
+  black: string | null;
+  winner: Colour | 'draw' | null;
+  reason: string | null;
+  moves: number;
+  endedAt: number | null;
+}
+
+/* ---------------------------------------------------------------- Clash of Clusters */
+
+export const CLASH_TURN_SECS = [30, 60, 120] as const;
+
+export interface ClashSide {
+  clusterId: number;
+  name: string;
+  kingId: number;
+  rating: number;
+  members: ClusterMember[];
+}
+
+export interface ClashProposal {
+  id: number;
+  by: number;
+  byName: string;
+  from: string;
+  to: string;
+  promotion?: 'q' | 'r' | 'b' | 'n';
+  san: string;
+  /** User ids backing this move (the proposer backs it). */
+  backers: number[];
+}
+
+export interface ClashView {
+  code: string;
+  status: 'waiting' | 'playing' | 'over' | 'aborted';
+  turnSecs: number;
+  /** The cluster this challenge is for (while waiting), or null if any cluster may accept. */
+  target: string | null;
+  white: ClashSide | null;
+  black: ClashSide | null;
+  moves: string[];
+  /** Who moves each piece: tracker id -> user id. */
+  owners: Record<string, number>;
+  proposals: ClashProposal[];
+  /** When the side to move must have chosen (server ms). */
+  turnEndsAt: number | null;
+  result: { winner: Colour | null; reason: string } | null;
+  ratingChange?: Record<Colour, { before: number; after: number }>;
+  drawOffer: Colour | null;
+  /** Your side, if you are in one of the clusters. */
+  you: Colour | null;
+  youKing: boolean;
+  watchers: number;
+  /** A note on the last move ("Ada's Raider, chosen by the King"). */
+  lastNote: string | null;
+  serverNow: number;
+}
+
+export type ClashMsg =
+  | { t: 'clash-create'; turnSecs: number; target?: string }
+  | { t: 'clash-accept'; code: string }
+  | { t: 'clash-open'; code: string }
+  | { t: 'clash-propose'; code: string; ply: number; move: { from: string; to: string; promotion?: 'q' | 'r' | 'b' | 'n' } }
+  | { t: 'clash-back'; code: string; id: number }
+  | { t: 'clash-play'; code: string; id: number }
+  | { t: 'clash-assign'; code: string; role: ClusterRole; to: number }
+  | { t: 'clash-resign'; code: string }
+  | { t: 'clash-draw'; code: string }
+  | { t: 'clash-cancel'; code: string }
+  | { t: 'clash-list' };
+
+export type ClashServerMsg =
+  | { t: 'clash'; clash: ClashView }
+  | { t: 'clash-created'; code: string }
+  | { t: 'clash-challenges'; open: { code: string; from: string; fromRating: number; turnSecs: number; target: string | null }[]; live: { code: string; white: string; black: string; moves: number }[] };

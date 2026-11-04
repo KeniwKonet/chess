@@ -26,6 +26,8 @@ import {
 } from '@cr/chess-core';
 import type { Accounts, UserRow } from './accounts';
 import type { Db } from './db';
+import { ClashHub } from './clash';
+import type { Clusters } from './clusters';
 import { PROVISIONAL_RD, rate } from './glicko';
 
 const CODE_ALPHABET = 'abcdefghjkmnpqrstuvwxyz23456789';
@@ -39,6 +41,8 @@ export interface Conn {
   send: (m: ServerMsg) => void;
   games: Set<string>;
   seek: string | null;
+  /** Clashes this connection follows. */
+  clashes: Set<string>;
   /** Message budget (simple token bucket). */
   budget: number;
   lastRefill: number;
@@ -88,17 +92,30 @@ export class Hub {
   private firstMoveMs: number;
   private log: (...a: unknown[]) => void;
   private sweeper: NodeJS.Timeout | null = null;
+  readonly clash: ClashHub | null = null;
 
   constructor(
     private db: Db,
     private accounts: Accounts,
     opts: HubOptions = {},
+    clusters?: Clusters,
   ) {
     this.now = opts.now ?? Date.now;
     this.timers = opts.timers ?? true;
     this.firstMoveMs = opts.firstMoveMs ?? (Number(process.env.FIRST_MOVE_MS) || ONLINE_TIMING.firstMove);
     this.log = opts.log ?? console.log;
     if (this.timers) this.sweeper = setInterval(() => this.sweep(), 60_000);
+    if (clusters) {
+      clusters.online = (id) => this.connsOf(id).length > 0;
+      this.clash = new ClashHub(db, accounts, clusters, { now: this.now, timers: this.timers, log: this.log, connsOf: (id) => this.connsOf(id) });
+    }
+  }
+
+  /** Every open connection of a signed-in user. */
+  connsOf(userId: number): Conn[] {
+    const out: Conn[] = [];
+    for (const c of this.conns) if (c.user?.id === userId) out.push(c);
+    return out;
   }
 
   /** Bring back games that were waiting or in play when the server last stopped. */
@@ -119,17 +136,19 @@ export class Hub {
       }
     }
     if (rows.length) this.log(`restored ${this.games.size} online games`);
+    await this.clash?.restore();
   }
 
   close() {
     for (const g of this.games.values()) if (g.timer) clearTimeout(g.timer);
     if (this.sweeper) clearInterval(this.sweeper);
+    this.clash?.close();
   }
 
   /* ---------- connections ---------- */
 
   connect(send: (m: ServerMsg) => void): Conn {
-    const c: Conn = { user: null, send, games: new Set(), seek: null, budget: 40, lastRefill: this.now() };
+    const c: Conn = { user: null, send, games: new Set(), seek: null, clashes: new Set(), budget: 40, lastRefill: this.now() };
     this.conns.add(c);
     return c;
   }
@@ -137,6 +156,7 @@ export class Hub {
   disconnect(c: Conn) {
     this.conns.delete(c);
     this.unseek(c);
+    this.clash?.disconnect(c);
     for (const code of c.games) {
       const g = this.games.get(code);
       if (!g) continue;
@@ -166,6 +186,10 @@ export class Hub {
       return c.send({ t: 'ready', user: (await this.accounts.publicUser(u.id))! });
     }
     if (msg.t === 'watch') return this.attach(c, String(msg.code), false);
+    if (msg.t.startsWith('clash-')) {
+      if (c.user) c.user = (await this.accounts.user(c.user.id)) ?? c.user;
+      return this.clash?.receive(c, msg as Parameters<ClashHub['receive']>[1]);
+    }
     if (!c.user) return c.send({ t: 'error', message: 'Please sign in first.', code: 'auth' });
     // Refresh the user (a guest may have just made an account).
     c.user = (await this.accounts.user(c.user.id)) ?? c.user;
@@ -469,13 +493,30 @@ export class Hub {
       await this.recordResult(g, result.winner);
     }
     await this.persist(g, result);
-    this.broadcast(g, { t: 'end', code: g.code, result, status, ...(g.ratingChange ? { ratingChange: g.ratingChange } : {}) });
+    await g.saving;
+    // Streaks and the running score between these two, for the result screen and sharing.
+    let extra = {};
+    if (status === 'over' && g.seats.w && g.seats.b) {
+      const [uw, ub] = [await this.accounts.user(g.seats.w.id), await this.accounts.user(g.seats.b.id)];
+      extra = {
+        streaks: { w: uw?.streak ?? 0, b: ub?.streak ?? 0 },
+        h2h: await this.accounts.headToHead(g.seats.w.id, g.seats.b.id),
+      };
+    }
+    this.broadcast(g, { t: 'end', code: g.code, result, status, ...(g.ratingChange ? { ratingChange: g.ratingChange } : {}), ...extra });
   }
 
   private async recordResult(g: Live, winner: Colour | null) {
     const w = g.seats.w!;
     const b = g.seats.b!;
-    const col = (id: number, k: 'wins' | 'losses' | 'draws') => this.db.query(`update users set games = games + 1, ${k} = ${k} + 1 where id = $1`, [id]);
+    // Win streaks: a win adds one; a loss or a draw ends the streak.
+    const col = (id: number, k: 'wins' | 'losses' | 'draws') =>
+      this.db.query(
+        k === 'wins'
+          ? 'update users set games = games + 1, wins = wins + 1, streak = streak + 1, best_streak = greatest(best_streak, streak + 1) where id = $1'
+          : `update users set games = games + 1, ${k} = ${k} + 1, streak = 0 where id = $1`,
+        [id],
+      );
     await col(w.id, winner === 'w' ? 'wins' : winner === 'b' ? 'losses' : 'draws');
     await col(b.id, winner === 'b' ? 'wins' : winner === 'w' ? 'losses' : 'draws');
     const cat = ratingCategory(g.tc);

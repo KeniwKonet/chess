@@ -9,6 +9,7 @@ import type { ClientMsg, RatingCategory } from '@cr/chess-core';
 import { Accounts, AuthError } from './accounts';
 import { openDb, type Db } from './db';
 import { Hub, type GameRow, type HubOptions } from './hub';
+import { Clusters } from './clusters';
 
 export interface Online {
   db: Db;
@@ -46,7 +47,8 @@ class Limiter {
 export async function startOnline(server: Server, opts: { dbUrl?: string; dataDir?: string; hub?: HubOptions } = {}): Promise<Online> {
   const db = await openDb({ url: opts.dbUrl, dataDir: opts.dataDir });
   const accounts = new Accounts(db);
-  const hub = new Hub(db, accounts, opts.hub);
+  const clusters = new Clusters(db, accounts);
+  const hub = new Hub(db, accounts, opts.hub, clusters);
   await hub.restore();
   const authLimit = new Limiter(20, 10 * 60_000);
 
@@ -125,6 +127,7 @@ export async function startOnline(server: Server, opts: { dbUrl?: string; dataDi
       const me = await accounts.fromToken(bearer(req));
       return send(res, 200, await accounts.register(body.name, body.password, me?.id));
     }
+    if (path.startsWith('/api/clusters')) return clusterApi(req, res, path, url, m);
     if (m === 'POST' && path === '/api/logout') {
       const t = bearer(req);
       if (t) await accounts.logout(t);
@@ -149,7 +152,14 @@ export async function startOnline(server: Server, opts: { dbUrl?: string; dataDi
         "select * from games where (white = $1 or black = $1) and status = 'over' order by ended_at desc limit 20",
         [u.id],
       );
-      return send(res, 200, { user: await accounts.publicUser(u.id), games: await Promise.all(rows.map((r) => hub.record(r))) });
+      const me = await accounts.fromToken(bearer(req));
+      return send(res, 200, {
+        user: await accounts.publicUser(u.id),
+        games: await Promise.all(rows.map((r) => hub.record(r))),
+        rivals: await accounts.rivals(u.id),
+        // Your score against this player, when signed in.
+        ...(me && me.id !== u.id ? { vsYou: await accounts.headToHead(me.id, u.id) } : {}),
+      });
     }
     hit = /^\/api\/games\/([a-z0-9]{4,12})$/.exec(path);
     if (hit) {
@@ -158,6 +168,59 @@ export async function startOnline(server: Server, opts: { dbUrl?: string; dataDi
       return send(res, 200, { game: await hub.record(row) });
     }
     return send(res, 404, { error: 'Not found.' });
+  }
+
+  async function clusterApi(req: IncomingMessage, res: ServerResponse, path: string, url: URL, m: string) {
+    const me = await accounts.fromToken(bearer(req));
+    if (m === 'GET' && path === '/api/clusters') return send(res, 200, { clusters: await clusters.list(url.searchParams.get('q')) });
+    if (m === 'GET' && path === '/api/clusters/mine') {
+      if (!me) return send(res, 401, { error: 'Please sign in again.' });
+      const mine = await clusters.mine(me.id);
+      const pending = await db.query<{ name: string }>(
+        "select c.name from cluster_members m join clusters c on c.id = m.cluster_id where m.user_id = $1 and m.status = 'pending'",
+        [me.id],
+      );
+      return send(res, 200, { cluster: mine ? await clusters.detail(mine.clusterId, me) : null, requests: pending.map((p) => p.name) });
+    }
+    const hit = /^\/api\/clusters\/([^/]{1,40})(?:\/([a-z-]+))?$/.exec(path);
+    if (!hit) return send(res, 404, { error: 'Not found.' });
+    const name = decodeURIComponent(hit[1]!);
+    const action = hit[2];
+    if (m === 'GET' && !action) return send(res, 200, { cluster: await clusters.detail(name, me) });
+    if (m !== 'POST') return send(res, 405, { error: 'Method not allowed.' });
+    if (!me) return send(res, 401, { error: 'Please sign in first.' });
+    const body = await readBody(req);
+    const uid = Number(body.user);
+    let out: unknown;
+    switch (action) {
+      case undefined:
+        if (name !== 'new') return send(res, 404, { error: 'Not found.' });
+        out = await clusters.create(me, body.name, body.motto);
+        break;
+      case 'join':
+        out = await clusters.requestJoin(me, name);
+        break;
+      case 'decide':
+        out = await clusters.decide(me, name, uid, body.as);
+        break;
+      case 'role':
+        out = await clusters.setRole(me, name, uid, body.role);
+        break;
+      case 'sub':
+        out = await clusters.substitute(me, name, Number(body.out), Number(body.in));
+        break;
+      case 'remove':
+        out = await clusters.remove(me, name, uid);
+        break;
+      case 'motto':
+        out = await clusters.setMotto(me, name, body.motto);
+        break;
+      case 'leave':
+        return send(res, 200, await clusters.leave(me, name));
+      default:
+        return send(res, 404, { error: 'Not found.' });
+    }
+    return send(res, 200, { cluster: out });
   }
 
   /** Handles /api/* and /health; returns false for anything else. */
