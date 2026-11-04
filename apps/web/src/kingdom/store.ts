@@ -14,7 +14,7 @@ const saved = (() => {
 })();
 
 export interface KState {
-  screen: 'home' | 'setup' | 'playing';
+  screen: 'home' | 'setup' | 'online' | 'playing';
   opponent: Opponent;
   aiLevel: AiLevel;
   side: Colour | 'random';

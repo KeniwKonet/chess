@@ -92,3 +92,4 @@ export * from './bonds';
 export type { Square } from 'chess.js';
 export * from './kingdom';
 export * from './kingdomAi';
+export * from './online';

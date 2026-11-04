@@ -10,7 +10,7 @@ const PORT = 8790;
 let server: ChildProcess;
 
 test.beforeAll(async () => {
-  server = spawn('npx', ['tsx', 'apps/server/src/main.ts'], { env: { ...process.env, PORT: String(PORT) }, stdio: ['ignore', 'pipe', 'inherit'] });
+  server = spawn('npx', ['tsx', 'apps/server/src/main.ts'], { env: { ...process.env, PORT: String(PORT), DATA_DIR: 'memory://' }, stdio: ['ignore', 'pipe', 'inherit'] });
   await new Promise<void>((res, rej) => {
     const t = setTimeout(() => rej(new Error('server did not start')), 30_000);
     server.stdout!.on('data', (d) => {

@@ -118,6 +118,73 @@
 .k-rules dt small { color: var(--parchment-dim); font-weight: 500; }
 .kingdom .perf.k-perf { top: 84px; left: var(--gutter); right: auto; }
 
+
+/* Online */
+.k-online { width: min(560px, 100%); }
+.k-setup-head h2 { flex: 1; }
+.k-link { font-family: var(--font-cond); font-size: 12.5px; letter-spacing: 0.04em; padding: 3px 9px; border-radius: 999px; border: 1px solid rgba(195, 154, 91, 0.4); color: var(--parchment-dim); }
+.k-link::before { content: ''; display: inline-block; width: 7px; height: 7px; border-radius: 50%; margin-right: 6px; background: #e8b33a; vertical-align: 1px; }
+.k-link-open::before { background: #5bc46b; }
+.k-link-down::before { background: var(--bad); }
+.k-error { color: #ffb4aa; background: rgba(217, 72, 59, 0.14); border: 1px solid rgba(217, 72, 59, 0.5); border-radius: 8px; padding: 8px 10px; margin: 10px 0 0; font-size: 14px; }
+.k-callout { background: rgba(232, 179, 58, 0.12); border: 1px solid rgba(232, 179, 58, 0.45); border-radius: 8px; padding: 8px 12px; margin: 12px 0 0; color: #ffe7a3; }
+.k-hint { color: var(--parchment-dim); font-size: 12.5px; align-self: center; }
+.k-tabs { margin-top: 14px; }
+.k-tabs .btn { flex: 1; min-height: 40px; }
+.k-tabs.small { margin: 10px 0 6px; max-width: 260px; }
+.k-form { display: grid; gap: 10px; margin-top: 14px; }
+.k-form label { display: grid; gap: 4px; }
+.k-form label span { font-family: var(--font-cond); font-weight: 600; font-size: 13px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--bronze-300); }
+.k-form input, .k-linkbox {
+  font: inherit; font-size: 16px; color: var(--parchment); background: rgba(0, 0, 0, 0.35); border: 1px solid rgba(195, 154, 91, 0.45);
+  border-radius: 8px; padding: 10px 12px; min-height: 44px; width: 100%; box-sizing: border-box;
+}
+.k-form input:focus, .k-linkbox:focus { outline: 2px solid var(--sun); outline-offset: 1px; border-color: var(--sun); }
+.k-form .btn-primary { min-height: 46px; }
+.k-upgrade { padding: 12px; border: 1px dashed rgba(195, 154, 91, 0.45); border-radius: 10px; }
+.k-me { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; margin-top: 12px; padding: 10px 12px; border-radius: 10px; background: rgba(0, 0, 0, 0.25); }
+.k-me b { font-family: var(--font-cond); font-size: 19px; display: block; }
+.k-me small { color: var(--parchment-dim); font-size: 13px; }
+.k-me-actions { display: flex; gap: 6px; flex-wrap: wrap; }
+.k-wait { display: grid; justify-items: center; gap: 12px; text-align: center; padding: 16px 0 6px; }
+.k-wait p { margin: 0; line-height: 1.5; }
+.k-wait .menu-actions { justify-content: center; flex-wrap: wrap; }
+.k-wait a.btn { text-decoration: none; display: inline-flex; align-items: center; }
+.k-cancel { margin-top: 4px; }
+.k-spinner { width: 42px; height: 42px; border-radius: 50%; border: 3px solid rgba(232, 179, 58, 0.25); border-top-color: var(--sun); animation: k-spin 0.9s linear infinite; }
+@keyframes k-spin { to { transform: rotate(360deg); } }
+.k-linkbox { text-align: center; font-size: 14.5px; }
+.k-list { list-style: none; padding: 0; margin: 12px 0 0; display: grid; gap: 6px; }
+.k-row { width: 100%; display: grid; gap: 3px; text-align: left; padding: 10px 12px; border-radius: 9px; border: 1px solid rgba(195, 154, 91, 0.35); background: linear-gradient(180deg, #33261a, #21180f); color: var(--parchment); font: inherit; cursor: pointer; min-height: 52px; }
+.k-row:hover, .k-row:focus-visible { border-color: var(--sun); outline: none; }
+.k-row-main { display: flex; flex-wrap: wrap; gap: 4px 14px; font-family: var(--font-cond); font-weight: 600; font-size: 16px; }
+.k-row-meta { color: var(--parchment-dim); font-size: 13px; }
+.side-w-text { color: #f3d27a; }
+.side-b-text { color: #8fb6f0; }
+.k-empty { margin: 14px 0 4px; }
+.k-board { list-style: none; padding: 0; margin: 4px 0 0; }
+.k-board li { display: grid; grid-template-columns: 30px 1fr auto auto; gap: 10px; align-items: baseline; padding: 7px 6px; border-bottom: 1px solid rgba(195, 154, 91, 0.15); }
+.k-rank { color: var(--parchment-dim); font-variant-numeric: tabular-nums; }
+.k-board-name { font-family: var(--font-cond); font-weight: 600; font-size: 16px; overflow: hidden; text-overflow: ellipsis; }
+.k-board-rating { font-weight: 700; font-variant-numeric: tabular-nums; color: var(--sun); }
+.k-board small { color: var(--parchment-dim); }
+.k-away { font-family: var(--font-cond); font-size: 12px; text-transform: uppercase; letter-spacing: 0.08em; color: #ffb4aa; border: 1px solid rgba(217, 72, 59, 0.55); border-radius: 999px; padding: 2px 8px; }
+.k-banners { position: absolute; left: 50%; transform: translateX(-50%); top: calc(var(--gutter) + 70px); width: min(560px, calc(100vw - 2 * var(--gutter))); display: grid; gap: 6px; z-index: 6; }
+.k-banner { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 8px 12px; border-radius: 10px; background: rgba(22, 17, 12, 0.94); border: 1px solid var(--sun); font-family: var(--font-cond); font-weight: 600; font-size: 15.5px; box-shadow: var(--shadow); }
+.k-banner .btn { min-height: 36px; }
+.k-banner.warn { border-color: var(--bad); }
+.k-banner.subtle { border-color: rgba(195, 154, 91, 0.4); font-weight: 500; color: var(--parchment-dim); justify-self: center; padding: 4px 12px; }
+.k-rating-change { list-style: none; padding: 0; margin: 12px 0 0; display: grid; gap: 4px; }
+.k-rating-change li { display: grid; grid-template-columns: 1fr auto 52px; gap: 10px; padding: 6px 10px; border-radius: 8px; background: rgba(0, 0, 0, 0.25); font-variant-numeric: tabular-nums; }
+.k-rating-change li.you { outline: 1px solid rgba(232, 179, 58, 0.5); }
+.k-rating-change .up { color: #7fd88b; text-align: right; font-weight: 700; }
+.k-rating-change .down { color: #ff9a8e; text-align: right; font-weight: 700; }
+@media (max-width: 600px) {
+  .k-banners { top: calc(var(--gutter) + 62px); }
+  .k-banner { font-size: 14.5px; }
+}
+@media (prefers-reduced-motion: reduce) { .k-spinner { animation-duration: 3s; } }
+
 @media (max-width: 600px) {
   .k-bar { padding: 6px 8px; gap: 8px; }
   .k-avatar { width: 34px; height: 34px; font-size: 22px; }
