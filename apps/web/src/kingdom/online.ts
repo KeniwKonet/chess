@@ -316,8 +316,8 @@ function handle(m: ServerMsg) {
       if (!g || g.code !== m.code) return;
       useOnline.setState({ game: { ...g, drawOffer: m.drawOffer } });
       if (m.drawOffer && m.drawOffer !== g.you && g.you) {
+        // The banner with Accept/Decline says it; just a sound here.
         sfx('check');
-        toast('Your opponent offers a draw.', 'good');
       } else if (!m.drawOffer && g.drawOffer === g.you && g.you) toast('Draw declined. Fight on!', 'warn');
       return;
     }

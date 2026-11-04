@@ -305,7 +305,11 @@
   .k-toast { font-size: 15px; }
 }
 @media (max-height: 500px) and (min-width: 600px) {
-  .k-bar { width: min(300px, 38vw); left: var(--gutter); transform: none; }
+  .k-bar { width: min(360px, 46vw); left: var(--gutter); transform: none; gap: 6px; padding: 5px 6px; }
+  .k-bar .k-avatar { width: 30px; height: 30px; font-size: 20px; }
+  .k-bar .k-clock { font-size: 18px; min-width: 56px; padding: 3px 6px; }
+  .k-bar .k-actions .btn { min-width: 38px; padding: 6px 8px; }
+  .k-name { font-size: 14.5px; }
   .k-bar.top { top: var(--gutter); }
   .k-bar.bottom { bottom: var(--gutter); }
   .k-card { left: auto; right: var(--gutter); transform: none; width: min(340px, 42vw); top: auto; bottom: var(--gutter); }
