@@ -353,6 +353,7 @@
 .k-table th { text-align: left; font-family: var(--font-cond); font-size: 12px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--bronze-300); padding: 6px; border-bottom: 1px solid rgba(195, 154, 91, 0.3); }
 .k-table td { padding: 7px 6px; border-bottom: 1px solid rgba(195, 154, 91, 0.12); }
 .k-table tr.you td { background: rgba(232, 179, 58, 0.1); }
+.k-table .k-link-btn, .k-board .k-link-btn { min-height: 36px; display: inline-flex; align-items: center; }
 .k-table tr.out td { color: var(--parchment-dim); }
 .k-vs { color: var(--parchment-dim); font-size: 13px; }
 .k-res { font-family: var(--font-cond); font-variant-numeric: tabular-nums; min-width: 34px; text-align: right; }
@@ -402,7 +403,6 @@
   /* Tables fit the width; names are easy to tap. */
   .k-table { font-size: 13.5px; }
   .k-table th, .k-table td { padding: 6px 4px; }
-  .k-table .k-link-btn, .k-board .k-link-btn { min-height: 36px; display: inline-flex; align-items: center; }
   .k-hide-phone { display: none; }
   /* Forms: input and button stack when space is short. */
   .k-search { flex-wrap: wrap; }
