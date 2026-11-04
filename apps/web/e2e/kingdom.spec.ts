@@ -36,7 +36,7 @@ test.afterEach(async ({ page }) => {
 });
 
 test('home offers the computer and two-player games; tap a soldier, see its role and moves, move, and the computer replies', async ({ page }) => {
-  await expect(page.getByRole('heading', { name: 'Chess Realms' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'ChessFront' })).toBeVisible();
   await page.getByRole('button', { name: /Play the computer/ }).click();
   await page.locator('label.diff', { hasText: 'Squire' }).click();
   await page.getByRole('button', { name: /Sun \(moves first\)/ }).click();

@@ -1,4 +1,4 @@
-/* Chess Realms HUD — walnut and bronze, Sun gold vs Moon blue (carried over from the v2 design). */
+/* ChessFront HUD — walnut and bronze, Sun gold vs Moon blue (carried over from the v2 design). */
 :root {
   --walnut-950: #0f0b07;
   --walnut-900: #16110c;
@@ -424,3 +424,10 @@ button { font: inherit; color: inherit; }
 @media (min-width: 901px) and (max-width: 1180px) and (min-height: 501px) {
   .selection { left: var(--gutter); transform: none; bottom: calc(var(--gutter) + 200px); }
 }
+
+/* Shown when the browser cannot draw 3D (Root.tsx). */
+.no-webgl { position: fixed; inset: 0; display: grid; place-items: center; padding: var(--gutter, 16px); background: radial-gradient(ellipse at center, #2a1f14, #0e0a06); }
+.no-webgl .panel { width: min(480px, 100%); padding: 24px; text-align: center; }
+.no-webgl h1 { font-family: var(--font-display); font-weight: 400; font-size: 40px; margin: 4px 0 0; }
+.no-webgl p { line-height: 1.55; color: var(--parchment); }
+.no-webgl .btn { margin-top: 8px; }

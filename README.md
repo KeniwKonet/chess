@@ -1,5 +1,8 @@
-# Chess Realms
+# ChessFront
 
+**The Living Chess Experience** · [chessfront.app](https://chessfront.app)
+
+Two kingdoms at war, and every soldier moves by the rules of chess. The home screen is the turn-based 3D chess battle (play the computer or a friend on one device). The real-time battle below opens with `?mode=battle`.
 
 A stylised isometric 3D real-time war game in the browser. Two kingdoms, Sun and Moon, fight over a living battlefield. A chessboard, the War Table, commands the same war: every chess move has an effect on the battle, and checkmate wins it.
 

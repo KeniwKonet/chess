@@ -99,7 +99,7 @@ function Loading({ failed }: { failed: boolean }) {
   return (
     <div className={`loading${ready ? ' done' : ''}`} aria-hidden={ready}>
       <div className="loading-mark">♜</div>
-      <div className="loading-title">Chess Realms</div>
+      <div className="loading-title">ChessFront</div>
       <div className="loading-sub">Raising the Ashen Divide…</div>
       <div className="loading-bar"><span /></div>
     </div>

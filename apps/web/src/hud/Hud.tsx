@@ -43,7 +43,7 @@ function TopLeft() {
     <div className="brand panel">
       <div className="brand-mark" aria-hidden="true">♜</div>
       <div>
-        <div className="brand-name">Chess Realms</div>
+        <div className="brand-name">ChessFront</div>
         <div className="brand-sub">The Ashen Divide · Sun vs Moon</div>
       </div>
       <span className="chip chip-proto" title="Prototype: battlefield, armies, combat, Moon AI, War Table and match flow. Economy and extra unit types are not in this build.">

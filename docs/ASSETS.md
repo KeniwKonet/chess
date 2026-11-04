@@ -29,7 +29,7 @@ For hosts that only serve common web file types, build a self-contained JSON kit
 
 ```bash
 PLAIN=1 KIT_OUT=apps/web/public/assets/kit.json node tools/build-assets.mjs
-VITE_KIT_FILE=kit.json npm run build
+npm run build -w @cr/web -- --mode plain   # uses kit.json, units.json and pieces.json
 ```
 
 This version uses standard mesh quantisation instead of meshopt, so no WebAssembly decoder is needed. It comes to 4.2 MB with the buffers embedded. The hosted milestone 1 preview uses it.

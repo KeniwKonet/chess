@@ -14,7 +14,7 @@ test.beforeAll(async () => {
   await new Promise<void>((res, rej) => {
     const t = setTimeout(() => rej(new Error('server did not start')), 30_000);
     server.stdout!.on('data', (d) => {
-      if (String(d).includes('Chess Realms server')) {
+      if (String(d).includes('ChessFront server')) {
         clearTimeout(t);
         res();
       }

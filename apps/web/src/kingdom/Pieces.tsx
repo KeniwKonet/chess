@@ -8,6 +8,7 @@
  *   - projectiles and bursts (bolts, spells, boulders, dust, promotion light).
  */
 import { useEffect, useMemo, useRef } from 'react';
+import { assetUrl } from '../assets/files';
 import { useFrame, useLoader } from '@react-three/fiber';
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
@@ -19,7 +20,7 @@ import { BOARD_Y, CLIPS, GLYPH, HEIGHT, MODEL_OF, TEXTURE_OF, type ClipKey, type
 import { director } from './director';
 import { useKingdom } from './store';
 
-export const PIECES_URL = `${import.meta.env.BASE_URL}assets/${import.meta.env.VITE_PIECES_FILE ?? 'pieces.glb'}`;
+export const PIECES_URL = assetUrl('pieces');
 const MODELS: PieceModel[] = ['footman', 'raider', 'ranger', 'sorceress', 'king'];
 const SIDES = ['w', 'b'] as const;
 const CAP = 10;
