@@ -1,13 +1,37 @@
 # Putting ChessFront live
 
-ChessFront has two parts, deployed separately from the same repository:
+**One deployment runs everything.** `npm run build` makes the game's pages (`dist/`), and `npm start` runs the server, which serves those pages *and* online play from the same address:
 
-| Part | What it is | Where | Address |
-| --- | --- | --- | --- |
-| **The game** | A static site (`npm run build` → `dist/`) | Orbits (already live) | chessfront.app |
-| **The server** | A Node program that runs all the time (`npm start`) | Any host that runs Node | api.chessfront.app |
+- `/` and the game's files: the game itself
+- `/api/…`: accounts, ratings, tournaments, admin
+- `/online`: the live game connection (WebSocket)
+- `/health`: a status check for the host
 
-The game looks for the server at `https://api.chessfront.app` by itself. Until the server is up, everything still works except online play, clusters and tournaments.
+So `chessfront.app` needs just **one Node project** on your host. The game finds online play on its own address automatically. Any domain you add to that project (`chessfront.app`, `www.chessfront.app`, `api.chessfront.app`) works the same way.
+
+## On Orbits: switch the project from "Static site" to Node
+
+Orbits allows one project per repository, so change the existing `chess` project rather than making a second one. In that project, open **Settings** (Build & deploy / General):
+
+| Setting | Value |
+| --- | --- |
+| Framework / type | **Node.js** (a server), not Static site |
+| Install command | `npm ci --include=dev` (the build needs the dev tools) |
+| Build command | `npm run build` |
+| Start command | `npm start` |
+| Output directory | leave empty (a Node server has none) |
+| Node version | 22 |
+| Health check | `/health` |
+
+Then add the environment variables below (at least `DATABASE_URL` and `ADMIN_NAMES`) and press **Redeploy**.
+
+When the deploy finishes:
+- `https://chessfront.app/health` shows `{"ok":true,…}`;
+- `https://chessfront.app` shows the game, and **Play online** says **Connected**.
+
+If the project settings don't offer a change of framework, open the project's **Settings → Delete project** (only the Orbits project, not your code), then **New project → Import `chess`**. Choose **Node.js** with the settings above, and add the `chessfront.app` domain back to it.
+
+Other hosts (Render, Railway, Fly.io, a VPS) use the same three commands. `render.yaml` and the `Dockerfile` are in the repo.
 
 ## 1. A database
 
@@ -33,7 +57,9 @@ The GitHub connection in Supabase isn't needed for ChessFront. It's for projects
 
 Free Supabase projects pause after a week with no activity. Once players are online every day this won't happen; otherwise, restore the project from the dashboard.
 
-## 2. The server on Orbits
+## 2. (Only if you split them) a separate server
+
+You don't need this with the single project above.
 
 If Orbits can run Node web services, create a **second project** from this same GitHub repository, with these settings:
 
@@ -69,10 +95,9 @@ If Orbits only hosts static sites, use **Render** instead: New → Blueprint →
 
 ## 4. The address
 
-At your domain registrar, add a DNS record for `api` (a CNAME to the host name your server host gives you). Wait until the host shows a valid certificate; `.app` domains only work over HTTPS. Then check that:
+With the single project, `chessfront.app` already points at it, so there's nothing more to do. `api.chessfront.app` is optional: if you keep it, add it to the same project.
 
-- `https://api.chessfront.app/health` answers `{"ok":true,…}`;
-- in the game, Play online shows "Connected".
+`.app` domains only work over HTTPS; the host issues the certificate. Check that `https://chessfront.app/health` answers `{"ok":true,…}` and that Play online shows "Connected".
 
 ## 5. After launch
 

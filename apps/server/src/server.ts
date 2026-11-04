@@ -13,6 +13,7 @@ import type { HubOptions } from './online/hub';
 import type { ClientMessage, ServerMessage } from '@cr/match';
 import type { Difficulty, Side } from '@cr/game-core';
 import { Room } from './room';
+import { makeStatic } from './static';
 
 export interface ServerHandle {
   port: number;
@@ -31,6 +32,8 @@ export interface ServerOptions {
   hub?: HubOptions;
   mailer?: OnlineOptions['mailer'];
   roundBreakMs?: number;
+  /** Serve the built game from ./dist too (default: when it exists). */
+  serveGame?: boolean;
 }
 
 const DIFFS = new Set(['recruit', 'captain', 'warlord']);
@@ -38,10 +41,13 @@ const MAX_MESSAGE = 4096;
 
 export async function startServer(port = 0, opts: ServerOptions = {}): Promise<ServerHandle> {
   const rooms = new Map<string, Room>();
+  // The built game, when there is one (`npm run build`): one deployment serves pages, API and sockets.
+  const site = opts.serveGame === false ? null : makeStatic();
   const http = createServer((req, res) => {
     if (online?.handleHttp(req, res)) return;
-    res.writeHead(200, { 'content-type': 'text/plain' });
-    res.end('ChessFront server. The game lives at https://chessfront.app\n');
+    if (site?.handle(req, res)) return;
+    res.writeHead(site?.enabled ? 404 : 200, { 'content-type': 'text/plain' });
+    res.end(site?.enabled ? 'Not found\n' : 'ChessFront server. The game lives at https://chessfront.app\n');
   });
   const online = opts.online === false ? null : await startOnline(http, { dbUrl: opts.dbUrl, dataDir: opts.dataDir, hub: opts.hub, mailer: opts.mailer, roundBreakMs: opts.roundBreakMs });
   const wss = new WebSocketServer({ noServer: true, maxPayload: MAX_MESSAGE });
