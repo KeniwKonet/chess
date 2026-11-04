@@ -35,8 +35,10 @@ export const ONLINE_BASE = (() => {
   if (q && /^https?:\/\//.test(q)) return q.replace(/\/$/, '');
   // During development the game (Vite) and the server run on different ports.
   if (/^(localhost|127\.|192\.168\.|10\.)/.test(location.hostname) && location.port !== '8787') return `http://${location.hostname}:8787`;
-  // In production one server serves both the game and online play, so it is the same site.
-  return location.origin;
+  // When the server itself serves the game (api.chessfront.app, or a Render/Railway/Fly address), it is the same site.
+  if (/^api\./.test(location.hostname) || /\.(onrender\.com|up\.railway\.app|fly\.dev)$/.test(location.hostname)) return location.origin;
+  // The game on its static host (chessfront.app, previews) reaches the server at api.chessfront.app.
+  return 'https://api.chessfront.app';
 })();
 const WS_URL = `${ONLINE_BASE.replace(/^http/, 'ws')}/online`;
 const TOKEN_KEY = 'cf-token';
