@@ -12,6 +12,7 @@
  * Only clips that exist in the files are used (see CLIP_SOURCES).
  */
 import * as THREE from 'three';
+import { assetUrl } from '../assets/files';
 import type { GLTF } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import type { UnitType } from '@cr/game-core';
 import { withFog } from '../world/fog';
@@ -48,7 +49,7 @@ export interface UnitModel<C extends string = ClipName> {
   feet: THREE.Vector3;
 }
 
-export const UNITS_URL = `${import.meta.env.BASE_URL}assets/${import.meta.env.VITE_UNITS_FILE ?? 'units.glb'}`;
+export const UNITS_URL = assetUrl('units');
 export const unitTextureUrl = (type: UnitType, side: 'sun' | 'moon') => `${import.meta.env.BASE_URL}assets/units/${MODEL_OF[type]}_${side}.png`;
 
 function nearestBone(o: THREE.Object3D): THREE.Bone | null {

@@ -25,7 +25,7 @@ jobs:
         run: |
           cd apps/web/dist
           touch .nojekyll
-          printf '# Chess Realms: ready-to-serve site\n\nBuilt from main (%s) by .github/workflows/deploy-branch.yml.\nServe this branch as-is: no install, no build command, output folder = repository root.\n' "${GITHUB_SHA::7}" > README.md
+          printf '# ChessFront: ready-to-serve site\n\nBuilt from main (%s) by .github/workflows/deploy-branch.yml.\nServe this branch as-is: no install, no build command, output folder = repository root.\n' "${GITHUB_SHA::7}" > README.md
           git init -q -b deploy
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"

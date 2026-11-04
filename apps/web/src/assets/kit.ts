@@ -4,6 +4,7 @@
  * ready for instancing.
  */
 import * as THREE from 'three';
+import { assetUrl } from './files';
 import type { GLTF } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { withFog } from '../world/fog';
 
@@ -25,8 +26,8 @@ export interface Kit {
   has: (model: string) => boolean;
 }
 
-/** kit.glb by default; set VITE_KIT_FILE=kit.json for hosts that only serve common web file types. */
-export const KIT_URL = `${import.meta.env.BASE_URL}assets/${import.meta.env.VITE_KIT_FILE ?? 'kit.glb'}`;
+/** kit.glb (kit.json in a `--mode plain` build). */
+export const KIT_URL = assetUrl('kit');
 
 /** Shared time uniform for animated materials. */
 export const windTime = { value: 0 };

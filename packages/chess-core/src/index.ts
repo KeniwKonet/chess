@@ -1,6 +1,6 @@
 /**
  * Standard chess rules, delegated to chess.js (BSD-2-Clause, widely tested).
- * This package never changes the rules of chess. Chess Realms' battlefield
+ * This package never changes the rules of chess. ChessFront' battlefield
  * effects ("bonds") live in a separate rules layer added in milestone 5, which
  * reads the moves this package reports and never alters their legality.
  */

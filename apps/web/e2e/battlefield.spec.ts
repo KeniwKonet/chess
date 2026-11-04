@@ -20,7 +20,7 @@ test.beforeEach(async ({ page }) => {
 });
 
 test('loads the battlefield with HUD and no script errors', async ({ page }) => {
-  await expect(page.locator('.brand-name')).toHaveText('Chess Realms');
+  await expect(page.locator('.brand-name')).toHaveText('ChessFront');
   await expect(page.locator('.resources')).toContainText('820');
   await expect(page.locator('.minimap canvas')).toBeVisible();
   await expect(page.locator('.log')).toContainText('Battle begins');

@@ -12,7 +12,7 @@ export function KingdomApp() {
   const showSettings = useUi((s) => s.showSettings);
   useEffect(() => {
     syncDirectorSpeed();
-    document.title = 'Chess Realms';
+    document.title = 'ChessFront · The Living Chess Experience';
   }, []);
   return (
     <div className="app kingdom">
@@ -22,7 +22,7 @@ export function KingdomApp() {
       {showSettings && <Settings kingdom />}
       <div className={`loading${loaded ? ' done' : ''}`} aria-hidden={loaded}>
         <div className="loading-mark">♜</div>
-        <div className="loading-title">Chess Realms</div>
+        <div className="loading-title">ChessFront</div>
         <div className="loading-sub">Mustering the armies…</div>
         <div className="loading-bar"><span /></div>
       </div>

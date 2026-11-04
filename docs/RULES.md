@@ -1,4 +1,4 @@
-# Chess Realms rules: how the War Table commands the battlefield
+# ChessFront rules: how the War Table commands the battlefield
 
 The battle has two layers that run at the same time:
 

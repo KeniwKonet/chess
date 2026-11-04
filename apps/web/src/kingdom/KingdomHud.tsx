@@ -31,10 +31,10 @@ function Home() {
   };
   return (
     <div className="k-scrim">
-      <section className="k-home panel" aria-label="Chess Realms">
+      <section className="k-home panel" aria-label="ChessFront">
         <div className="title-mark" aria-hidden="true">♜</div>
-        <h1>Chess Realms</h1>
-        <p className="title-sub">Two kingdoms · one law: the rules of chess</p>
+        <h1>ChessFront</h1>
+        <p className="title-sub">The Living Chess Experience</p>
         <p className="k-lede">
           Command the Sun's army against the Moon. Every soldier is a chess piece: Footmen march like pawns, Raiders leap like knights, Rangers shoot along the diagonals, Siege Towers roll like rooks, the Sorceress strikes in every direction, and the King must survive. No one moves beyond the rules of chess.
         </p>

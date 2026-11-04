@@ -78,9 +78,9 @@ function Title() {
   }, []);
   return (
     <div className="menu-scrim title-scrim">
-      <section className="menu panel title-card" aria-label="Chess Realms">
+      <section className="menu panel title-card" aria-label="ChessFront">
         <div className="title-mark" aria-hidden="true">♜</div>
-        <h1>Chess Realms</h1>
+        <h1>ChessFront</h1>
         <p className="title-sub">The Ashen Divide · Sun against Moon</p>
         <p className="title-text">
           Command the Sun's soldiers across a living battlefield, and move your pieces on the War Table to drive them. Take the crossings, hold Vey Watchtower, and bring down Nocturne Castle before the Moon takes Sunspire.
