@@ -6,7 +6,9 @@ import { GLYPH } from './board';
 import { aiColour, choosePromotion, exitToHome, kc, offerDraw, resign, setAnimSpeed, setSound, startGame, takeback } from './controller';
 import { enterOnline, useOnline } from './online';
 import { OnlineBanner, OnlineMenuExtras, OnlineResult, OnlineScreen } from './OnlineHud';
-import { useKingdom, type Opponent } from './store';
+import { ClashMenuExtras, ClashPanel, ClashResult, ClustersScreen } from './ClusterHud';
+import { useClusters } from './clash';
+import { useKingdom } from './store';
 import { director } from './director';
 import { unlockAudio } from './sound';
 
@@ -19,6 +21,7 @@ export function KingdomHud() {
       {screen === 'home' && <Home />}
       {screen === 'setup' && <Setup />}
       {screen === 'online' && <OnlineScreen />}
+      {screen === 'clusters' && <ClustersScreen />}
       {screen === 'playing' && <Playing />}
     </div>
   );
@@ -26,39 +29,53 @@ export function KingdomHud() {
 
 // ---------------------------------------------------------------- home and setup
 
+const MODES: { id: string; title: string; blurb: string; tag?: string }[] = [
+  { id: 'ai', title: 'Play the computer', blurb: 'Four commanders, from Squire to Warlord.' },
+  { id: 'online', title: 'Play online', blurb: 'Invite a friend by link or get paired. Ratings, streaks, rivals.' },
+  { id: 'clusters', title: 'Clash of Clusters', blurb: 'Your team is one army: every member commands a soldier.', tag: 'New' },
+  { id: 'local', title: 'Two players, one device', blurb: 'Pass and play, with chess clocks.' },
+  { id: 'battle', title: 'Real-time battle', blurb: 'Armies march live while a chessboard commands them.' },
+];
+
 function Home() {
   const [show, setShow] = useState(false);
-  const go = (o: Opponent) => {
+  const go = (id: string) => {
     unlockAudio();
-    useKingdom.setState({ opponent: o, screen: 'setup' });
+    if (id === 'ai' || id === 'local') useKingdom.setState({ opponent: id, screen: 'setup' });
+    else if (id === 'online') enterOnline();
+    else if (id === 'clusters') useKingdom.setState({ screen: 'clusters' });
+    else if (id === 'battle') location.search = '?mode=battle';
   };
   return (
     <div className="k-scrim">
-      <section className="k-home panel" aria-label="ChessFront">
-        <div className="title-mark" aria-hidden="true">♜</div>
-        <h1>ChessFront</h1>
-        <p className="title-sub">The Living Chess Experience</p>
-        <p className="k-lede">
-          Command the Sun's army against the Moon. Every soldier is a chess piece: Footmen march like pawns, Raiders leap like knights, Rangers shoot along the diagonals, Siege Towers roll like rooks, the Sorceress strikes in every direction, and the King must survive. No one moves beyond the rules of chess.
-        </p>
-        <div className="k-modes">
-          <button className="k-mode" onClick={() => go('ai')}>
-            <span className="k-mode-glyph">♞</span>
-            <span><b>Play the computer</b><small>Four levels, from Squire to Warlord</small></span>
-          </button>
-          <button className="k-mode" onClick={() => go('local')}>
-            <span className="k-mode-glyph">♟</span>
-            <span><b>Two players, one device</b><small>Pass and play, with chess clocks</small></span>
-          </button>
-          <button className="k-mode" onClick={() => { unlockAudio(); enterOnline(); }}>
-            <span className="k-mode-glyph">♛</span>
-            <span><b>Play online</b><small>Invite a friend by link, or get paired. Ratings and live spectators</small></span>
-          </button>
-        </div>
+      <section className="k-home k-picker panel" aria-label="ChessFront">
+        <header className="k-picker-head">
+          <span className="title-mark" aria-hidden="true">♜</span>
+          <div>
+            <h1>ChessFront</h1>
+            <p className="title-sub">The Living Chess Experience</p>
+          </div>
+        </header>
+        <p className="k-lede">Two kingdoms at war, and every soldier moves by the rules of chess. Choose how you want to fight.</p>
+        <ul className="k-modecards">
+          {MODES.map((m) => (
+            <li key={m.id}>
+              <button className="k-modecard" onClick={() => go(m.id)} aria-label={`${m.title}. ${m.blurb}`}>
+                <span className="k-modecard-shot">
+                  <img src={`${import.meta.env.BASE_URL}modes/${m.id}.jpg`} alt="" loading="lazy" width={480} height={300} />
+                  {m.tag && <span className="k-modecard-tag">{m.tag}</span>}
+                </span>
+                <span className="k-modecard-text">
+                  <b>{m.title}</b>
+                  <small>{m.blurb}</small>
+                </span>
+              </button>
+            </li>
+          ))}
+        </ul>
         <div className="k-home-foot">
           <button className="btn" onClick={() => setShow(true)}>How to play</button>
           <button className="btn" onClick={() => useUi.setState({ showSettings: true })}>Settings</button>
-          <a className="btn" href="?mode=battle">Battle mode (real-time)</a>
         </div>
       </section>
       {show && <RulesSheet onClose={() => setShow(false)} />}
@@ -146,8 +163,9 @@ function Playing() {
       <Promotion />
       <Moves />
       <OnlineBanner />
+      <ClashPanel />
       <GameMenu />
-      {kc.opponent === 'online' ? <OnlineResult /> : <Result />}
+      {kc.opponent === 'online' ? <OnlineResult /> : kc.opponent === 'clash' ? <ClashResult /> : <Result />}
     </>
   );
 }
@@ -164,10 +182,15 @@ function PlayerBar({ colour, where }: { colour: Colour; where: 'top' | 'bottom' 
   useTicker(100);
   const thinking = useKingdom((s) => s.thinking);
   const og = useOnline((s) => s.game);
+  const cl = useClusters((s) => s.clash);
   const g = kc.game;
   const away = kc.opponent === 'online' && og && og.status === 'playing' && !og.presence[colour];
   const name = (() => {
     if (kc.opponent === 'ai') return colour === aiColour() ? `${SIDE_NAME[colour]} · ${AI_LEVELS[useKingdom.getState().aiLevel].label} (computer)` : `${SIDE_NAME[colour]} · You`;
+    if (kc.opponent === 'clash') {
+      const side = colour === 'w' ? cl?.white : cl?.black;
+      return side ? `${side.name} · ${side.rating}${cl?.you === colour ? ' (your cluster)' : ''}` : SIDE_NAME[colour];
+    }
     if (kc.opponent === 'online') {
       const p = colour === 'w' ? og?.white : og?.black;
       if (!p) return SIDE_NAME[colour];
@@ -313,7 +336,8 @@ function GameMenu() {
   const close = () => useKingdom.setState({ showMenu: false });
   const canTakeback = kc.opponent === 'ai' && !g.timeControl && !g.over && g.history.some((m) => m.colour === kc.you);
   const isOnline = kc.opponent === 'online';
-  const watching = isOnline && !kc.you;
+  const isClash = kc.opponent === 'clash';
+  const watching = (isOnline || isClash) && !kc.you;
   const early = g.history.length < 2;
   return (
     <div className="k-scrim" onClick={close}>
@@ -324,13 +348,14 @@ function GameMenu() {
         </div>
         <div className="menu-actions col">
           {canTakeback && <button className="btn" onClick={() => { takeback(); close(); }}>↶ Take back my move</button>}
-          {!g.over && !watching && kc.opponent !== 'local' && !(isOnline && early) && <button className="btn" onClick={() => { offerDraw(); close(); }}>½ Offer a draw</button>}
+          {!g.over && !watching && !isClash && kc.opponent !== 'local' && !(isOnline && early) && <button className="btn" onClick={() => { offerDraw(); close(); }}>½ Offer a draw</button>}
           {!g.over && kc.opponent === 'local' && <button className="btn" onClick={() => { offerDraw(); close(); }}>½ Agree a draw</button>}
-          {!g.over && !watching && <button className="btn" onClick={() => resign()}>{isOnline && early ? '✕ Call the game off (no rating change)' : '⚑ Resign'}</button>}
+          {!g.over && !watching && !isClash && <button className="btn" onClick={() => resign()}>{isOnline && early ? '✕ Call the game off (no rating change)' : '⚑ Resign'}</button>}
           {isOnline && <OnlineMenuExtras close={close} />}
+          {isClash && <ClashMenuExtras close={close} />}
           <button className="btn" onClick={() => useKingdom.setState((x) => ({ viewFrom: x.viewFrom === 'w' ? 'b' : 'w' }))}>⟲ Turn the board around</button>
           <button className="btn" onClick={() => useKingdom.setState({ showHelp: true })}>? How each soldier moves</button>
-          {!isOnline && <button className="btn" onClick={() => exitToHome()}>⌂ Leave to the main menu</button>}
+          {!isOnline && !isClash && <button className="btn" onClick={() => exitToHome()}>⌂ Leave to the main menu</button>}
         </div>
         <div className="setting">
           <span>Battle animations</span>

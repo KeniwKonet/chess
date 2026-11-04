@@ -29,6 +29,10 @@ export const kc = {
   lastTick: 0,
   /** Called by online play to send a move instead of playing it locally. */
   send: null as null | ((m: MoveInput) => void),
+  /** In a clash: may this person move the soldier on this square now? */
+  mayMove: null as null | ((sq: string) => boolean),
+  /** In a clash: a move becomes a proposal to the cluster instead of being played. */
+  propose: null as null | ((m: { from: string; to: string; promotion?: 'q' | 'r' | 'b' | 'n' }) => void),
 };
 
 const bump = () => useKingdom.setState((s) => ({ rev: s.rev + 1 }));
@@ -37,6 +41,7 @@ export const canMove = (c: Colour) => !kc.game.over && kc.game.turn === c && (kc
 export const humanToMove = () => canMove(kc.game.turn);
 export const aiColour = (): Colour | null => (kc.opponent === 'ai' ? (kc.you === 'w' ? 'b' : 'w') : null);
 export const online = () => kc.opponent === 'online';
+export const clashing = () => kc.opponent === 'clash';
 
 export function startGame(opts: { opponent: Opponent; side?: Colour | 'random'; tc?: string; level?: string; fen?: string }) {
   unlockAudio();
@@ -47,6 +52,8 @@ export function startGame(opts: { opponent: Opponent; side?: Colour | 'random'; 
   kc.ai = null;
   if (kc.opponent === 'online' || opts.opponent === 'online') leaveOnlineGame();
   kc.send = null;
+  kc.mayMove = null;
+  kc.propose = null;
   const side = opts.side ?? s.side;
   kc.you = opts.opponent === 'local' ? 'both' : side === 'random' ? (Math.random() < 0.5 ? 'w' : 'b') : side;
   director.speed = ANIM_SPEED[s.animSpeed];
@@ -87,14 +94,14 @@ export function tapSquare(sq: string) {
   }
   // Selecting one of your own pieces (or any piece, just to read its card).
   if (piece) {
-    const mine = canMove(piece.colour);
+    const mine = kc.mayMove ? kc.mayMove(sq) : canMove(piece.colour);
     if (s.selected === sq) {
       useKingdom.setState({ selected: null, targets: [], card: null });
       return;
     }
     sfx('select');
     useKingdom.setState({ selected: sq, targets: mine ? g.targets(sq) : [], card: { role: piece.role, colour: piece.colour } });
-    if (!mine && !g.over && humanToMove() && piece.colour === g.turn) toast('Not your soldier.', 'warn');
+    if (!mine && !g.over && humanToMove() && piece.colour === g.turn) toast(kc.mayMove ? 'Another member commands that soldier.' : 'Not your soldier.', 'warn');
     return;
   }
   useKingdom.setState({ selected: null, targets: [], card: null });
@@ -109,6 +116,12 @@ export function choosePromotion(role: Role | null) {
 
 /** Play a move for the side to move (a person at this device, or the computer). */
 export function play(m: MoveInput): boolean {
+  if (clashing()) {
+    // A clash move is a proposal; it reaches the board when the cluster decides.
+    if (kc.propose && typeof m !== 'string') kc.propose(m);
+    useKingdom.setState({ selected: null, targets: [], card: null });
+    return true;
+  }
   if (online() && !humanToMove()) return false;
   const r = kc.game.move(kc.game.turn, m, kc.clockNow());
   if (!r.ok) {
@@ -219,7 +232,7 @@ export function frame(dt: number) {
   const g = kc.game;
   const now = kc.clockNow();
   // Online, only the server's clock decides a loss on time.
-  if (!online() && !g.over && g.checkTime(now)) finish();
+  if (!online() && !clashing() && !g.over && g.checkTime(now)) finish();
 
   // Low-time ticking for the person at this device.
   if (g.timeControl && !g.over && humanToMove()) {
@@ -264,6 +277,8 @@ sound.on = useKingdom.getState().sound;
 
 export function exitToHome() {
   kc.ai = null;
+  kc.mayMove = null;
+  kc.propose = null;
   if (online()) leaveOnlineGame();
   kc.send = null;
   kc.opponent = 'ai';

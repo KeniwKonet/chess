@@ -26,6 +26,7 @@ import { director } from './director';
 import { kc } from './controller';
 import { sfx } from './sound';
 import { toast, useKingdom } from './store';
+import { handleClash, openClash, useClusters } from './clash';
 
 export const ONLINE_BASE = (() => {
   if (typeof location === 'undefined') return 'http://localhost:8787';
@@ -52,6 +53,9 @@ export interface OnlineGameMeta {
   rematchOffer: Colour | null;
   rematchNext: string | null;
   ratingChange: GameView['ratingChange'] | null;
+  /** Win streaks after the game, and the all-time score between the two (White's side). */
+  streaks: Record<Colour, number> | null;
+  h2h: { wins: number; losses: number; draws: number } | null;
   /** Server clock minus this device's clock (ms). */
   skew: number;
 }
@@ -243,7 +247,7 @@ function reconnect() {
 /** Watching needs no account: those messages may go before sign-in. */
 function flushWatch() {
   for (let i = 0; i < outbox.length; i++) {
-    if (outbox[i]!.t === 'watch') {
+    if (outbox[i]!.t === 'watch' || outbox[i]!.t === 'clash-open') {
       ws!.send(JSON.stringify(outbox[i]));
       outbox.splice(i--, 1);
     }
@@ -251,7 +255,7 @@ function flushWatch() {
 }
 
 export function send(m: ClientMsg) {
-  if (ws && ws.readyState === WebSocket.OPEN && (authed || m.t === 'watch' || m.t === 'ping')) ws.send(JSON.stringify(m));
+  if (ws && ws.readyState === WebSocket.OPEN && (authed || m.t === 'watch' || m.t === 'clash-open' || m.t === 'ping')) ws.send(JSON.stringify(m));
   else {
     outbox.push(m);
     openSocket();
@@ -277,6 +281,8 @@ function handle(m: ServerMsg) {
       // Back in a game after a dropped connection: ask for it again.
       const g = s.game;
       if (g && g.status === 'playing') outbox.unshift({ t: g.you ? 'join' : 'watch', code: g.code });
+      const cl = useClusters.getState().clash;
+      if (cl && (cl.status === 'playing' || cl.status === 'waiting')) outbox.unshift({ t: 'clash-open', code: cl.code });
       while (outbox.length) ws!.send(JSON.stringify(outbox.shift()));
       return;
     }
@@ -296,7 +302,7 @@ function handle(m: ServerMsg) {
     case 'move':
       return onMove(m);
     case 'end':
-      return onEnd(m.code, m.result, m.status, m.ratingChange);
+      return onEnd(m.code, m.result, m.status, m.ratingChange, m.streaks, m.h2h);
     case 'offer': {
       const g = s.game;
       if (!g || g.code !== m.code) return;
@@ -348,6 +354,10 @@ function handle(m: ServerMsg) {
       return;
     case 'pong':
       return;
+    case 'clash':
+    case 'clash-created':
+    case 'clash-challenges':
+      return handleClash(m);
   }
 }
 
@@ -395,6 +405,8 @@ function loadGame(v: GameView) {
     rematchOffer: v.rematchOffer ?? null,
     rematchNext: v.rematchOf ?? null,
     ratingChange: v.ratingChange ?? null,
+    streaks: s.game?.code === v.code ? s.game.streaks : null,
+    h2h: s.game?.code === v.code ? s.game.h2h : null,
     skew: v.serverNow - Date.now(),
   };
   if (v.status === 'waiting') {
@@ -473,14 +485,23 @@ function onMove(m: Extract<ServerMsg, { t: 'move' }>) {
   useKingdom.setState((k) => ({ rev: k.rev + 1 }));
 }
 
-function onEnd(code: string, result: { winner: Colour | null; reason: string }, status: GameView['status'], ratingChange?: GameView['ratingChange']) {
+function onEnd(
+  code: string,
+  result: { winner: Colour | null; reason: string },
+  status: GameView['status'],
+  ratingChange?: GameView['ratingChange'],
+  streaks?: Record<Colour, number>,
+  h2h?: { wins: number; losses: number; draws: number },
+) {
   const g = useOnline.getState().game;
   if (!g || g.code !== code) {
     // An invite we were waiting on was closed.
     if (useOnline.getState().code === code) useOnline.setState({ view: 'lobby', code: null });
     return;
   }
-  useOnline.setState({ game: { ...g, status, ratingChange: ratingChange ?? null, drawOffer: null } });
+  useOnline.setState({ game: { ...g, status, ratingChange: ratingChange ?? null, drawOffer: null, streaks: streaks ?? null, h2h: h2h ?? null } });
+  // Keep the lobby's record up to date.
+  void api<{ user: PublicUser }>('/api/me').then((r) => useOnline.setState({ user: r.user })).catch(() => {});
   kc.game.result = { winner: result.winner, reason: result.reason } as KingdomResult;
   if (kc.game.timeControl) {
     // Freeze the clocks where they are.
@@ -562,6 +583,12 @@ export function openFromUrl(): boolean {
   const q = new URLSearchParams(location.search);
   const play = q.get('play');
   const watch = q.get('watch');
+  const clash = q.get('clash');
+  if (clash) {
+    useKingdom.setState({ screen: 'clusters' });
+    openClash(clash);
+    return true;
+  }
   if (!play && !watch) return false;
   useKingdom.setState({ screen: 'online' });
   if (watch) {

@@ -27,6 +27,7 @@ import {
   watchLink,
 } from './online';
 import { toast, useKingdom } from './store';
+import { shareResult } from './share';
 
 const tcLabel = (tc: OnlineTc) => (tc === 'untimed' ? 'No clock' : `${tc.replace('+', ' min + ')} s`);
 const tcShort = (tc: OnlineTc) => (tc === 'untimed' ? '∞' : tc);
@@ -86,7 +87,7 @@ function ErrorLine() {
   return error ? <p className="k-error" role="alert">{error}</p> : null;
 }
 
-function SignIn({ after }: { after?: () => void }) {
+export function SignIn({ after }: { after?: () => void }) {
   const busy = useOnline((s) => s.busy);
   const [mode, setMode] = useState<'guest' | 'login' | 'register'>('guest');
   const [name, setName] = useState('');
@@ -179,7 +180,7 @@ function Lobby() {
   const u = s.user;
   const guest = !u || u.guest;
   const canRate = !guest && s.tc !== 'untimed';
-  const [tab, setTab] = useState<'play' | 'watch' | 'ranks'>('play');
+  const [tab, setTab] = useState<'play' | 'watch' | 'ranks' | 'rivals'>('play');
   const [upgrade, setUpgrade] = useState(false);
   return (
     <div className="k-lobby">
@@ -192,17 +193,24 @@ function Lobby() {
             </small>
           )}
           {u?.guest && <small>Guest · casual games</small>}
+          {u?.record && u.record.games > 0 && (
+            <small className="k-me-record">
+              {u.record.wins}W {u.record.losses}L {u.record.draws}D{u.record.streak > 1 ? ` · 🔥 ${u.record.streak} wins in a row` : ''}
+              {u.record.bestStreak > 1 ? ` · best streak ${u.record.bestStreak}` : ''}
+            </small>
+          )}
         </div>
         <div className="k-me-actions">
+          {u && !u.guest && u.record && u.record.games > 0 && <button className="btn" onClick={() => shareProfile(u)}>Share</button>}
           {u?.guest && <button className="btn" onClick={() => setUpgrade((x) => !x)}>Make an account</button>}
           <button className="btn" onClick={() => void logout()}>Sign out</button>
         </div>
       </div>
       {upgrade && u?.guest && <Upgrade onDone={() => setUpgrade(false)} />}
       <div className="seg k-tabs" role="tablist">
-        {(['play', 'watch', 'ranks'] as const).map((t) => (
+        {(['play', 'watch', 'ranks', 'rivals'] as const).map((t) => (
           <button key={t} role="tab" aria-selected={tab === t} className={`btn${tab === t ? ' on' : ''}`} onClick={() => setTab(t)}>
-            {t === 'play' ? 'Play' : t === 'watch' ? 'Watch live' : 'Leaderboard'}
+            {t === 'play' ? 'Play' : t === 'watch' ? 'Watch' : t === 'ranks' ? 'Leaders' : 'Rivals'}
           </button>
         ))}
       </div>
@@ -251,6 +259,7 @@ function Lobby() {
       )}
       {tab === 'watch' && <LiveList />}
       {tab === 'ranks' && <Leaderboard />}
+      {tab === 'rivals' && u && <Rivals name={u.name} />}
     </div>
   );
 }
@@ -474,8 +483,25 @@ export function OnlineResult() {
             })}
           </ul>
         )}
+        {you && opp && g.h2h && (
+          <p className="k-h2h">
+            {(() => {
+              const mine = you === 'w' ? g.h2h : { wins: g.h2h.losses, losses: g.h2h.wins, draws: g.h2h.draws };
+              return (
+                <>
+                  You {mine.wins} – {mine.losses} {names[opp]}
+                  {mine.draws ? ` (${mine.draws} drawn)` : ''}
+                </>
+              );
+            })()}
+            {g.streaks && g.streaks[you] > 1 && <span className="k-streak">🔥 {g.streaks[you]} wins in a row</span>}
+          </p>
+        )}
         {you && opp && g.rematchOffer === opp && <p className="k-callout">Your opponent wants a rematch.</p>}
         <div className="menu-actions">
+          {won && opp && (
+            <button className="btn" onClick={() => shareWin(g, you!, opp, names)}>Share the win</button>
+          )}
           {you && !g.rematchNext && (
             <button className="btn btn-primary" onClick={onlineRematch} disabled={g.rematchOffer === you} autoFocus>
               {g.rematchOffer === you ? 'Rematch offered…' : g.rematchOffer === opp ? 'Accept the rematch' : 'Rematch'}
@@ -520,3 +546,64 @@ export function OnlineMenuExtras({ close }: { close: () => void }) {
   );
 }
 
+
+export const SignInPanel = SignIn;
+
+function shareWin(g: NonNullable<ReturnType<typeof useOnline.getState>['game']>, you: Colour, opp: Colour, names: Record<Colour, string>) {
+  const lines: string[] = [];
+  const rc = g.ratingChange;
+  if (rc) lines.push(`Rating ${rc[you].after} (+${rc[you].after - rc[you].before})`);
+  if (g.h2h) {
+    const mine = you === 'w' ? g.h2h : { wins: g.h2h.losses, losses: g.h2h.wins, draws: g.h2h.draws };
+    lines.push(`Head to head: ${mine.wins}–${mine.losses}${mine.draws ? ` (${mine.draws} drawn)` : ''} against ${names[opp]}`);
+  }
+  const streak = g.streaks?.[you] ?? 0;
+  void shareResult({
+    kicker: 'Victory',
+    title: `${names[you]} beat ${names[opp]}`,
+    lines: lines.length ? lines : [`${tcLabel(g.tc)} · ${Math.ceil(kc.game.history.length / 2)} moves`],
+    ...(streak > 1 ? { badge: { value: String(streak), label: 'win streak' } } : {}),
+    url: location.origin + location.pathname,
+  });
+}
+
+function shareProfile(u: NonNullable<ReturnType<typeof useOnline.getState>['user']>) {
+  const r = u.record!;
+  void shareResult({
+    kicker: 'My ChessFront record',
+    title: u.name,
+    lines: [
+      `Blitz ${u.ratings.blitz.rating} · Rapid ${u.ratings.rapid.rating}`,
+      `${r.wins} wins, ${r.losses} losses, ${r.draws} draws`,
+      ...(r.bestStreak > 1 ? [`Best win streak: ${r.bestStreak}`] : []),
+    ],
+    ...(r.streak > 1 ? { badge: { value: String(r.streak), label: 'win streak' } } : {}),
+    url: location.origin + location.pathname,
+  });
+}
+
+/** Everyone you've played, and the score against each. */
+function Rivals({ name }: { name: string }) {
+  const [rows, setRows] = useState<{ name: string; wins: number; losses: number; draws: number }[] | null>(null);
+  const [err, setErr] = useState<string | null>(null);
+  useEffect(() => {
+    api<{ rivals: { name: string; wins: number; losses: number; draws: number }[] }>(`/api/users/${encodeURIComponent(name)}`)
+      .then((r) => setRows(r.rivals))
+      .catch((e: Error) => setErr(e.message));
+  }, [name]);
+  if (err) return <p className="k-error">{err}</p>;
+  if (!rows) return <p className="log-empty">Loading…</p>;
+  if (!rows.length) return <p className="log-empty k-empty">Your head-to-head scores appear here once you've finished a game.</p>;
+  return (
+    <ol className="k-board">
+      {rows.map((r) => (
+        <li key={r.name}>
+          <span className="k-rank">{r.wins > r.losses ? '▲' : r.wins < r.losses ? '▼' : '='}</span>
+          <span className="k-board-name">{r.name}</span>
+          <span className="k-board-rating">{r.wins}–{r.losses}</span>
+          <small>{r.draws ? `${r.draws} drawn` : ''}</small>
+        </li>
+      ))}
+    </ol>
+  );
+}

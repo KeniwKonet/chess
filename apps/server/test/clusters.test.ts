@@ -105,6 +105,8 @@ describe('clusters', () => {
     expect(c.members).toBe(2);
     expect(c.roster.map((m: any) => m.status).sort()).toEqual(['member', 'member', 'spectator', 'sub']);
 
+    // The King keeps the King's role unless passing the crown.
+    expect((await call('/api/clusters/Okeigbo%20Lions/role', king.token, { user: king.id, role: 'b1' })).status).toBe(400);
     // Switch roles: Ada becomes a Raider.
     c = (await call('/api/clusters/Okeigbo%20Lions/role', king.token, { user: ada.id, role: 'n1' })).body.cluster;
     expect(c.roster.find((m: any) => m.id === ada.id).role).toBe('n1');

@@ -218,6 +218,7 @@ export class Clusters {
     const target = ms.find((x) => x.user_id === userId);
     if (!target || target.status === 'pending' || target.status === 'spectator') throw new AuthError('Only members and substitutes can take a role.');
     if (target.role === r) return this.detail(c.id, king);
+    if (target.user_id === c.king && r !== 'k') throw new AuthError('The King keeps the King’s role. To take another, pass the crown first.');
     const holder = ms.find((x) => x.role === r);
     // Free the role first (roles are unique within a cluster), then swap.
     if (holder) await this.db.query('update cluster_members set role = null where cluster_id = $1 and user_id = $2', [c.id, holder.user_id]);
