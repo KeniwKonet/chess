@@ -29,6 +29,8 @@ export interface UserRow {
   wins: number;
   losses: number;
   draws: number;
+  streak: number;
+  best_streak: number;
 }
 
 const CATEGORIES: RatingCategory[] = ['blitz', 'rapid'];
@@ -121,12 +123,12 @@ export class Accounts {
   }
 
   async user(id: number): Promise<UserRow | null> {
-    const rows = await this.db.query<UserRow>('select id, name, guest, games, wins, losses, draws from users where id = $1', [id]);
+    const rows = await this.db.query<UserRow>('select id, name, guest, games, wins, losses, draws, streak, best_streak from users where id = $1', [id]);
     return rows[0] ?? null;
   }
 
   async byName(name: string): Promise<UserRow | null> {
-    const rows = await this.db.query<UserRow>('select id, name, guest, games, wins, losses, draws from users where name_key = $1', [name.toLowerCase()]);
+    const rows = await this.db.query<UserRow>('select id, name, guest, games, wins, losses, draws, streak, best_streak from users where name_key = $1', [name.toLowerCase()]);
     return rows[0] ?? null;
   }
 
@@ -155,7 +157,43 @@ export class Accounts {
   async publicUser(id: number): Promise<PublicUser | null> {
     const u = await this.user(id);
     if (!u) return null;
-    return { id: u.id, name: u.name, guest: u.guest, ratings: await this.ratings(id), record: { games: u.games, wins: u.wins, losses: u.losses, draws: u.draws } };
+    return { id: u.id, name: u.name, guest: u.guest, ratings: await this.ratings(id), record: { games: u.games, wins: u.wins, losses: u.losses, draws: u.draws, streak: u.streak, bestStreak: u.best_streak } };
+  }
+
+  /** Results between two players (finished online games), from `a`'s side. */
+  async headToHead(a: number, b: number) {
+    const rows = await this.db.query<{ white: number; winner: string | null; n: string | number }>(
+      `select white, winner, count(*) as n from games
+       where status = 'over' and ((white = $1 and black = $2) or (white = $2 and black = $1))
+       group by white, winner`,
+      [a, b],
+    );
+    const out = { wins: 0, losses: 0, draws: 0 };
+    for (const r of rows) {
+      const n = Number(r.n);
+      const aColour = r.white === a ? 'w' : 'b';
+      if (r.winner === 'draw' || r.winner === null) out.draws += n;
+      else if (r.winner === aColour) out.wins += n;
+      else out.losses += n;
+    }
+    return out;
+  }
+
+  /** Everyone `a` has played, with the score against each (most played first). */
+  async rivals(a: number, limit = 20) {
+    const rows = await this.db.query<{ opp: number; name: string; won: string; lost: string; drawn: string }>(
+      `select opp, u.name,
+         sum(case when winner = mine then 1 else 0 end) as won,
+         sum(case when winner <> mine and winner <> 'draw' then 1 else 0 end) as lost,
+         sum(case when winner = 'draw' then 1 else 0 end) as drawn
+       from (select case when white = $1 then black else white end as opp,
+                    case when white = $1 then 'w' else 'b' end as mine, winner
+             from games where status = 'over' and (white = $1 or black = $1)) g
+       join users u on u.id = g.opp
+       group by opp, u.name order by count(*) desc limit $2`,
+      [a, limit],
+    );
+    return rows.map((r) => ({ name: r.name, wins: Number(r.won), losses: Number(r.lost), draws: Number(r.drawn) }));
   }
 
   async leaderboard(cat: RatingCategory, limit = 50) {

@@ -67,6 +67,49 @@ create table if not exists games (
 create index if not exists games_status on games(status);
 create index if not exists games_white on games(white, ended_at desc);
 create index if not exists games_black on games(black, ended_at desc);
+alter table users add column if not exists streak int not null default 0;
+alter table users add column if not exists best_streak int not null default 0;
+create table if not exists clusters (
+  id serial primary key,
+  name text not null,
+  name_key text not null unique,
+  motto text not null default '',
+  king int not null references users(id),
+  created_at timestamptz not null default now(),
+  rating double precision not null default 1500,
+  rd double precision not null default 350,
+  vol double precision not null default 0.06,
+  clashes int not null default 0,
+  wins int not null default 0,
+  losses int not null default 0,
+  draws int not null default 0
+);
+create table if not exists cluster_members (
+  cluster_id int not null references clusters(id) on delete cascade,
+  user_id int not null references users(id) on delete cascade,
+  status text not null,
+  role text,
+  joined_at timestamptz not null default now(),
+  primary key (cluster_id, user_id)
+);
+create unique index if not exists cluster_members_one on cluster_members(user_id) where status <> 'pending';
+create unique index if not exists cluster_roles on cluster_members(cluster_id, role) where role is not null;
+create table if not exists clashes (
+  code text primary key,
+  white int references clusters(id) on delete set null,
+  black int references clusters(id) on delete set null,
+  status text not null,
+  turn_secs int not null,
+  state text not null default '{}',
+  moves text not null default '',
+  winner text,
+  reason text,
+  white_before int, white_after int, black_before int, black_after int,
+  created_at timestamptz not null default now(),
+  ended_at timestamptz
+);
+create index if not exists clashes_white on clashes(white, ended_at desc);
+create index if not exists clashes_black on clashes(black, ended_at desc);
 `;
 
 export async function openDb(opts: { url?: string; dataDir?: string } = {}): Promise<Db> {
