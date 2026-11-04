@@ -221,7 +221,7 @@ function Standings({ t }: { t: TournamentDetail }) {
           <tr>
             <th>#</th>
             <th>Player</th>
-            <th>Rating</th>
+            <th className="k-hide-phone">Rating</th>
             {t.kind === 'swiss' ? <><th>Points</th><th title="Buchholz: the total of your opponents' points">Bh</th></> : <th>Status</th>}
           </tr>
         </thead>
@@ -230,7 +230,7 @@ function Standings({ t }: { t: TournamentDetail }) {
             <tr key={s.id} className={s.id === me ? 'you' : s.withdrawn || s.eliminated ? 'out' : ''}>
               <td>{t.status === 'open' ? '' : s.rank}</td>
               <td><button className="k-link-btn" onClick={() => void openProfile(s.name)}>{s.name}</button>{s.withdrawn ? ' (withdrew)' : ''}</td>
-              <td>{s.rating}</td>
+              <td className="k-hide-phone">{s.rating}</td>
               {t.kind === 'swiss' ? <><td><b>{s.score}</b></td><td>{s.buchholz}</td></> : <td>{t.status === 'finished' && s.rank === 1 ? '🏆 Champion' : s.eliminated ? 'Out' : t.status === 'open' ? '' : 'Still in'}</td>}
             </tr>
           ))}

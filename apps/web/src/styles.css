@@ -434,3 +434,6 @@ button { font: inherit; color: inherit; }
 .no-webgl-logo img { width: min(320px, 100%); height: auto; }
 .no-webgl p { line-height: 1.55; color: var(--parchment); }
 .no-webgl .btn { margin-top: 8px; }
+
+/* Phones: no double-tap zoom on controls, no grey flash on tap. */
+button, a, select, input, label, [role='tab'] { touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
