@@ -89,6 +89,9 @@ If Orbits only hosts static sites, use **Render** instead: New → Blueprint →
 | `MAIL_FROM` | with Resend | Sender, e.g. `ChessFront <no-reply@chessfront.app>`. The domain must be verified in Resend. |
 | `ALLOWED_ORIGINS` | optional | Limits which sites may call the API, e.g. `https://chessfront.app,https://www.chessfront.app`. Default: any. |
 | `METRICS_TOKEN` | optional | Protects `/metrics`. When set, requests must send it as a bearer token. |
+| `TURN_URLS` | optional, for voice chat | A TURN relay for players whose networks block direct calls, e.g. `turn:turn.example.com:3478,turns:turn.example.com:5349`. Without it, voice uses public STUN only, which connects most players but not all. Hosted options include Metered, Twilio and Cloudflare Calls; coturn is free to run yourself. |
+| `TURN_USERNAME`, `TURN_CREDENTIAL` | with `TURN_URLS` | The relay's username and password. Only signed-in players are sent them. |
+| `STUN_URLS` | optional | Replace the default STUN servers (Google's public ones). |
 | `LOG_LEVEL` | optional | `debug`, `info` (default), `warn` or `error`. |
 | `DATA_DIR` | without Postgres | Folder for the embedded database (on a persistent disk). |
 | `PORT` | set by the host | The port to listen on. |

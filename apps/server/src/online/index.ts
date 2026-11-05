@@ -50,7 +50,23 @@ export interface OnlineOptions {
 
 const MAX_BODY = 4096;
 const MAX_AVATAR_BODY = 100 * 1024;
-const MAX_MESSAGE = 2048;
+/** Room for a voice-chat session description (a few kB); everything else is far smaller. */
+const MAX_MESSAGE = 20 * 1024;
+
+/**
+ * Where browsers look for a way to reach each other for voice chat. Public
+ * STUN finds a direct route for most players; TURN_URLS (comma-separated, e.g.
+ * "turn:turn.example.com:3478,turns:turn.example.com:5349") with TURN_USERNAME
+ * and TURN_CREDENTIAL adds a relay for networks that block direct calls.
+ */
+function iceServers(): { urls: string | string[]; username?: string; credential?: string }[] {
+  const list: { urls: string | string[]; username?: string; credential?: string }[] = [
+    { urls: (process.env.STUN_URLS ?? 'stun:stun.l.google.com:19302,stun:stun1.l.google.com:19302').split(',').map((s) => s.trim()).filter(Boolean) },
+  ];
+  const turn = (process.env.TURN_URLS ?? '').split(',').map((s) => s.trim()).filter(Boolean);
+  if (turn.length) list.push({ urls: turn, username: process.env.TURN_USERNAME ?? '', credential: process.env.TURN_CREDENTIAL ?? '' });
+  return list;
+}
 
 /** Per-address limits. */
 class Limiter {
@@ -272,6 +288,11 @@ export async function startOnline(server: Server, opts: OnlineOptions = {}): Pro
       return send(res, 200, { category: cat, players: await accounts.leaderboard(cat) });
     }
     if (path === '/api/live') return send(res, 200, { games: hub.live() });
+    if (path === '/api/ice') {
+      // Network helpers for voice chat. A TURN relay (if set) carries the call when two players can't reach each other directly.
+      await signedIn(req);
+      return send(res, 200, { iceServers: iceServers() });
+    }
     let hit = /^\/api\/avatars\/(\d{1,10})$/.exec(path);
     if (hit) {
       const a = await profiles.avatar(Number(hit[1]));

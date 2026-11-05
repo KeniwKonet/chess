@@ -409,3 +409,73 @@
   .k-search input { flex: 1 1 180px; }
   .k-search .btn { flex: 1 0 auto; }
 }
+
+/* Table talk: reactions and voice dock (bottom right, clear of the centred bottom bar on wide screens). */
+.k-talk { position: absolute; right: var(--gutter); bottom: var(--gutter); z-index: 5; display: flex; gap: 8px; align-items: flex-end; }
+.k-talk-btn {
+  width: 50px; height: 50px; border-radius: 50%; display: grid; place-items: center; font-size: 22px; cursor: pointer; position: relative;
+  background: var(--panel-bg); border: 1px solid var(--panel-border); color: var(--parchment); box-shadow: var(--shadow); touch-action: manipulation;
+}
+.k-talk-btn:hover, .k-talk-btn.on { border-color: var(--bronze-300); }
+.k-talk-btn:focus-visible { outline: 2px solid var(--sun); outline-offset: 2px; }
+.k-talk-btn.mic.v-live { border-color: var(--good); box-shadow: 0 0 0 2px rgba(91, 184, 116, 0.45), var(--shadow); }
+.k-talk-btn.mic.v-live.muted { border-color: var(--bad); box-shadow: 0 0 0 2px rgba(217, 72, 59, 0.45), var(--shadow); }
+.k-talk-btn.mic.v-waiting, .k-talk-btn.mic.v-connecting, .k-talk-btn.mic.v-asking { border-color: var(--sun); }
+.k-talk-btn.mic.v-failed { border-color: var(--bad); }
+/* The other player is on voice and you aren't yet. */
+.k-talk-btn.mic.ask::after { content: ''; position: absolute; top: 4px; right: 4px; width: 11px; height: 11px; border-radius: 50%; background: var(--good); box-shadow: 0 0 0 2px var(--walnut-900); animation: k-pulse 1.4s ease-in-out infinite; }
+.k-talk-pop { position: absolute; right: 0; bottom: calc(100% + 10px); width: min(330px, calc(100vw - 2 * var(--gutter))); padding: 12px 14px; }
+.k-talk-pop h3 { margin: 0 0 6px; font-family: var(--font-display); font-weight: 400; font-size: 20px; }
+.k-talk-pop p { margin: 0 0 10px; font-size: 14.5px; line-height: 1.45; }
+.k-talk-peer { color: var(--parchment-dim); }
+.k-talk-status { font-family: var(--font-cond); font-weight: 600; font-size: 15.5px; }
+.k-talk-status.s-live { color: var(--good); }
+.k-talk-status.s-failed { color: #ffb4aa; }
+.k-talk-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.k-talk-actions .btn { min-height: 40px; }
+.k-react-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; }
+.k-react-btn { font-size: 28px; line-height: 1; padding: 8px 0; border-radius: 10px; background: rgba(0, 0, 0, 0.25); border: 1px solid transparent; cursor: pointer; touch-action: manipulation; }
+.k-react-btn:hover, .k-react-btn:focus-visible { border-color: var(--bronze-400); background: rgba(255, 255, 255, 0.06); outline: none; }
+.k-react-btn:active { transform: scale(0.92); }
+
+/* Reactions floating off a player's bar. */
+.k-floats { position: absolute; left: 0; right: 0; height: 0; pointer-events: none; }
+.k-floats.bottom { top: 0; }
+.k-floats.top { bottom: 0; }
+.k-float { position: absolute; font-size: 38px; line-height: 1; filter: drop-shadow(0 3px 6px rgba(0, 0, 0, 0.55)); animation: k-float-up 2.6s cubic-bezier(0.2, 0.7, 0.3, 1) forwards; }
+.k-floats.top .k-float { animation-name: k-float-down; }
+@keyframes k-float-up {
+  0% { transform: translateY(0) scale(0.4); opacity: 0; }
+  12% { transform: translateY(-28px) scale(1.15); opacity: 1; }
+  75% { opacity: 1; }
+  100% { transform: translateY(-150px) scale(1); opacity: 0; }
+}
+@keyframes k-float-down {
+  0% { transform: translateY(0) scale(0.4); opacity: 0; }
+  12% { transform: translateY(28px) scale(1.15); opacity: 1; }
+  75% { opacity: 1; }
+  100% { transform: translateY(150px) scale(1); opacity: 0; }
+}
+.k-voice-badge { display: inline-block; font-size: 13px; margin-right: 5px; vertical-align: 1px; opacity: 0.75; }
+.k-voice-badge.live { opacity: 1; }
+
+/* Narrower screens: the dock stacks just above the bottom bar's right end. */
+@media (max-width: 900px) {
+  .k-talk { flex-direction: column-reverse; bottom: calc(var(--gutter) + 72px); }
+  .k-talk-pop { bottom: 0; right: calc(100% + 10px); }
+}
+@media (max-width: 600px) {
+  .k-talk { bottom: calc(var(--gutter) + 64px); gap: 6px; }
+  .k-talk-btn { width: 46px; height: 46px; font-size: 20px; }
+  .k-talk-pop { right: 0; bottom: calc(100% + 8px); width: calc(100vw - 2 * var(--gutter)); max-width: 360px; }
+  .k-float { font-size: 32px; }
+}
+/* Phones on their side: bars sit on the left, so the dock goes bottom right in a row. */
+@media (max-height: 500px) and (min-width: 600px) {
+  .k-talk { flex-direction: row; bottom: var(--gutter); }
+  .k-talk-pop { right: 0; bottom: calc(100% + 8px); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .k-float { animation-duration: 1.6s; }
+  .k-talk-btn.mic.ask::after { animation: none; }
+}

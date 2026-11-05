@@ -12,6 +12,7 @@ import {
   ONLINE_TIME_CONTROLS,
   ONLINE_TIMING,
   ratingCategory,
+  REACTIONS,
   TIME_CONTROLS,
   type ClientMsg,
   type Colour,
@@ -21,8 +22,10 @@ import {
   type LiveGame,
   type OnlineTc,
   type Presence,
+  type Reaction,
   type SeatInfo,
   type ServerMsg,
+  type VoiceSignal,
 } from '@cr/chess-core';
 import type { Accounts, UserRow } from './accounts';
 import type { Db } from './db';
@@ -36,6 +39,10 @@ const newCode = () => Array.from({ length: 8 }, () => CODE_ALPHABET[randomInt(CO
 const other = (c: Colour): Colour => (c === 'w' ? 'b' : 'w');
 /** Untimed games with nobody connected leave memory after this (they stay saved). */
 const IDLE_EVICT_MS = 10 * 60_000;
+/** One reaction per player this often, at most. */
+const REACT_GAP_MS = 700;
+/** A session description with all its candidates is a few kB; anything far bigger is not one. */
+const MAX_SDP = 16_000;
 
 export interface Conn {
   user: UserRow | null;
@@ -75,6 +82,10 @@ interface Live {
   tournament?: string;
   /** Who failed to make their first move (when the game was called off for that). */
   noShow?: Colour;
+  /** Players who have switched voice chat on (and whether they muted themselves). */
+  voice: Partial<Record<Colour, { muted: boolean }>>;
+  /** When each player last reacted. */
+  reactedAt: Partial<Record<Colour, number>>;
 }
 
 /** Told about every finished or called-off game. */
@@ -184,6 +195,7 @@ export class Hub {
       g.conns.delete(c);
       const seat = this.seatOf(g, c);
       if (seat && !this.seatConnected(g, seat) && g.status === 'playing') g.awaySince[seat] = this.now();
+      if (seat) this.dropVoice(g, seat);
       if (g.conns.size === 0) g.idleSince = this.now();
       this.broadcastPresence(g);
     }
@@ -231,6 +243,7 @@ export class Hub {
           c.games.delete(g.code);
           const seat = this.seatOf(g, c);
           if (seat && !this.seatConnected(g, seat) && g.status === 'playing') g.awaySince[seat] = this.now();
+          if (seat) this.dropVoice(g, seat);
           this.broadcastPresence(g);
         }
         return;
@@ -277,7 +290,61 @@ export class Hub {
         return this.rematch(c, msg.code);
       case 'challenge':
         return this.challenge(c, msg);
+      case 'react':
+        return this.react(c, String(msg.code), msg.emoji);
+      case 'voice':
+        return this.voice(c, String(msg.code), msg.signal);
     }
+  }
+
+  /* ---------- table talk: reactions and voice ---------- */
+
+  /** A player in a game that is on or just finished (so "gg" still works), or null. */
+  private talker(c: Conn, code: string): { g: Live; seat: Colour } | null {
+    const g = this.games.get(code);
+    if (!g || (g.status !== 'playing' && g.status !== 'over') || !g.conns.has(c)) return null;
+    const seat = this.seatOf(g, c);
+    return seat ? { g, seat } : null;
+  }
+
+  /** An emoji from the set, shown to both players and anyone watching. Quietly drops anything faster than one every REACT_GAP_MS. */
+  private react(c: Conn, code: string, emoji: unknown) {
+    const t = this.talker(c, code);
+    if (!t || !(REACTIONS as readonly unknown[]).includes(emoji)) return;
+    const last = t.g.reactedAt[t.seat] ?? -Infinity;
+    if (this.now() - last < REACT_GAP_MS) return;
+    t.g.reactedAt[t.seat] = this.now();
+    this.broadcast(t.g, { t: 'react', code, by: t.seat, emoji: emoji as Reaction });
+  }
+
+  /** Voice chat signalling, passed only between the two players (never to spectators). */
+  private voice(c: Conn, code: string, signal: unknown) {
+    const t = this.talker(c, code);
+    const s = signal as VoiceSignal | null;
+    if (!t || !s || typeof s !== 'object') return;
+    const { g, seat } = t;
+    let out: VoiceSignal;
+    if (s.kind === 'on') {
+      if (s.on) g.voice[seat] = { muted: !!s.muted };
+      else delete g.voice[seat];
+      out = { kind: 'on', on: !!s.on, muted: !!s.muted };
+    } else if ((s.kind === 'offer' || s.kind === 'answer') && typeof s.sdp === 'string' && s.sdp.length <= MAX_SDP) {
+      // Descriptions only make sense once both have said yes to voice.
+      if (!g.voice.w || !g.voice.b) return;
+      out = { kind: s.kind, sdp: s.sdp };
+    } else return;
+    this.toSeat(g, other(seat), { t: 'voice', code, from: seat, signal: out });
+  }
+
+  private toSeat(g: Live, seat: Colour, m: ServerMsg) {
+    for (const c of g.conns) if (this.seatOf(g, c) === seat) c.send(m);
+  }
+
+  /** A player who has gone (closed the game or lost connection) is no longer on voice. */
+  private dropVoice(g: Live, seat: Colour) {
+    if (!g.voice[seat] || this.seatConnected(g, seat)) return;
+    delete g.voice[seat];
+    this.toSeat(g, other(seat), { t: 'voice', code: g.code, from: seat, signal: { kind: 'on', on: false } });
   }
 
   /** Challenge a friend directly: an invite whose link goes to them as a notification. */
@@ -437,6 +504,8 @@ export class Hub {
       rematchOffer: null,
       saving: Promise.resolve(),
       idleSince: null,
+      voice: {},
+      reactedAt: {},
     };
   }
 
@@ -483,6 +552,9 @@ export class Hub {
     const seat = this.seatOf(g, c);
     if (seat) delete g.awaySince[seat];
     c.send({ t: 'game', game: this.view(g, c) });
+    // Coming (back) into a game whose other player is already on voice.
+    const theirVoice = seat ? g.voice[other(seat)] : undefined;
+    if (seat && theirVoice) c.send({ t: 'voice', code: g.code, from: other(seat), signal: { kind: 'on', on: true, muted: theirVoice.muted } });
     this.broadcastPresence(g);
   }
 

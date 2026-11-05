@@ -28,6 +28,7 @@ import { sfx } from './sound';
 import { toast, useKingdom } from './store';
 import { handleClash, openClash, useClusters } from './clash';
 import { loadFriends, loadNotes, onNote, openTournament, useSocial } from './social';
+import { handleTalk, talkOff, talkOnGame } from './talk';
 
 export const ONLINE_BASE = (() => {
   if (typeof location === 'undefined') return 'http://localhost:8787';
@@ -175,6 +176,7 @@ export const register = (name: string, password: string, email?: string) => sign
 
 export async function logout() {
   await api('/api/logout', {}).catch(() => {});
+  talkOff();
   setToken(null);
   useOnline.setState({ user: null, view: 'lobby', seeking: null, code: null });
   closeSocket();
@@ -372,6 +374,9 @@ function handle(m: ServerMsg) {
     case 'clash-created':
     case 'clash-challenges':
       return handleClash(m);
+    case 'react':
+    case 'voice':
+      return handleTalk(m);
   }
 }
 
@@ -431,8 +436,10 @@ function loadGame(v: GameView) {
     return;
   }
   const same = s.game?.code === v.code && kc.opponent === 'online' && useKingdom.getState().screen === 'playing';
+  const rematchOf = s.game && s.game.rematchNext === v.code ? s.game.code : null;
   useOnline.setState({ game: meta, view: 'lobby', seeking: null, code: null });
   setUrl(v.you ? 'play' : 'watch', v.code);
+  talkOnGame(v.code, v.you, rematchOf);
 
   // Rebuild the board from the moves unless it already matches.
   const have = kc.game.history.map((m) => m.san);
@@ -576,6 +583,8 @@ export const onlineRematch = () => {
 /** Leave the game screen (the game itself goes on if it is still in play). */
 export function leaveOnlineGame() {
   const c = gameCode();
+  // Off voice first, while the server still counts us in the game.
+  talkOff();
   if (c) send({ t: 'leave', code: c });
   useOnline.setState({ game: null, view: 'lobby' });
   setUrl(null);
