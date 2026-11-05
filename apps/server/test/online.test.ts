@@ -331,6 +331,73 @@ describe('online games', () => {
     expect((await b.game(next)).you).toBe('w');
   });
 
+  it('shows reactions to both players and spectators, from the fixed set only and not too fast', async () => {
+    await boot();
+    const { code, w, b } = await pair();
+    const watcher = await connect();
+    watcher.send({ t: 'watch', code });
+    await watcher.game(code);
+
+    w.send({ t: 'react', code, emoji: '🔥' });
+    expect(await b.next('react')).toMatchObject({ code, by: 'w', emoji: '🔥' });
+    expect((await watcher.next('react')).emoji).toBe('🔥');
+    expect((await w.next('react')).by).toBe('w');
+
+    // Too soon after the last one, or not in the set: dropped without a fuss.
+    w.send({ t: 'react', code, emoji: '😂' });
+    w.send({ t: 'react', code, emoji: 'free text' as never });
+    // Messages are handled in order: once the pong is back, those two have been dealt with.
+    w.send({ t: 'ping', at: 1 });
+    await w.next('pong');
+    clock += 1000;
+    w.send({ t: 'react', code, emoji: '👏' });
+    expect((await b.next('react')).emoji).toBe('👏');
+    expect(b.msgs.filter((m) => m.t === 'react')).toHaveLength(0);
+
+    // Spectators can't send them.
+    watcher.send({ t: 'react', code, emoji: '😮' } as never);
+    watcher.send({ t: 'ping', at: 1 });
+    await watcher.next('pong');
+    b.send({ t: 'react', code, emoji: '🤝' });
+    expect((await w.next('react', (m) => m.by === 'b')).emoji).toBe('🤝');
+    expect(w.msgs.some((m) => m.t === 'react' && m.emoji === '😮')).toBe(false);
+  });
+
+  it('relays voice chat signalling between the two players only, and only once both said yes', async () => {
+    await boot();
+    const { code, w, b, tw, tb } = await pair();
+    const watcher = await connect();
+    watcher.send({ t: 'watch', code });
+    await watcher.game(code);
+
+    // Network helpers for the call: signed-in players only.
+    expect((await get('/api/ice')).status).toBe(401);
+    const ice = await get('/api/ice', tw);
+    expect(ice.body.iceServers[0].urls[0]).toMatch(/^stun:/);
+
+    // An offer before both are on voice goes nowhere.
+    w.send({ t: 'voice', code, signal: { kind: 'offer', sdp: 'v=0 early' } });
+    w.send({ t: 'voice', code, signal: { kind: 'on', on: true } });
+    expect((await b.next('voice')).signal).toEqual({ kind: 'on', on: true, muted: false });
+    b.send({ t: 'voice', code, signal: { kind: 'on', on: true, muted: true } });
+    expect((await w.next('voice')).signal).toEqual({ kind: 'on', on: true, muted: true });
+
+    w.send({ t: 'voice', code, signal: { kind: 'offer', sdp: 'v=0 offer' } });
+    expect(await b.next('voice')).toMatchObject({ from: 'w', signal: { kind: 'offer', sdp: 'v=0 offer' } });
+    b.send({ t: 'voice', code, signal: { kind: 'answer', sdp: 'v=0 answer' } });
+    expect((await w.next('voice')).signal).toEqual({ kind: 'answer', sdp: 'v=0 answer' });
+    expect(watcher.msgs.some((m) => m.t === 'voice')).toBe(false);
+    expect(b.msgs.some((m) => m.t === 'voice' && m.signal.kind === 'offer' && m.signal.sdp === 'v=0 early')).toBe(false);
+
+    // Black drops off: White hears they left voice. Coming back, Black is told White is still on.
+    b.ws.close();
+    expect((await w.next('voice')).signal).toEqual({ kind: 'on', on: false });
+    const b2 = await connect(tb);
+    b2.send({ t: 'join', code });
+    await b2.game(code);
+    expect(await b2.next('voice')).toMatchObject({ from: 'w', signal: { kind: 'on', on: true, muted: false } });
+  });
+
   it('resumes games in play after the server restarts', async () => {
     const dir = `${process.env.TMPDIR ?? '/tmp'}/cf-online-${Date.now()}`;
     await boot(dir);

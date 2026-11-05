@@ -157,9 +157,28 @@ export interface GameRecord {
   endedAt: number | null;
 }
 
+/* ---------------------------------------------------------------- table talk */
+
+/** Emoji the two players can throw at each other during a game (a fixed set, so nothing needs moderating). */
+export const REACTIONS = ['👍', '👏', '😂', '😮', '😅', '🔥', '🧠', '😤', '🤝', '👑'] as const;
+export type Reaction = (typeof REACTIONS)[number];
+
+/**
+ * Voice chat between the two players: the server only relays these, the
+ * audio itself goes straight between the browsers (WebRTC). White makes the
+ * offer once both have switched voice on; the descriptions carry all their
+ * network candidates, so one offer and one answer are enough.
+ */
+export type VoiceSignal =
+  | { kind: 'on'; on: boolean; muted?: boolean }
+  | { kind: 'offer'; sdp: string }
+  | { kind: 'answer'; sdp: string };
+
 /* Browser -> server */
 export type ClientMsg =
   | ClashMsg
+  | { t: 'react'; code: string; emoji: string }
+  | { t: 'voice'; code: string; signal: VoiceSignal }
   | { t: 'auth'; token: string }
   | { t: 'challenge'; to: string; tc: OnlineTc; colour: Colour | 'random'; rated: boolean }
   | { t: 'invite'; tc: OnlineTc; colour: Colour | 'random'; rated: boolean }
@@ -202,6 +221,8 @@ export type ServerMsg =
   | { t: 'offer'; code: string; drawOffer: Colour | null }
   | { t: 'presence'; code: string; presence: Presence }
   | { t: 'rematch'; code: string; by: Colour | null; next?: string }
+  | { t: 'react'; code: string; by: Colour; emoji: Reaction }
+  | { t: 'voice'; code: string; from: Colour; signal: VoiceSignal }
   | { t: 'error'; message: string; code?: string }
   | { t: 'pong'; at: number; serverNow: number };
 

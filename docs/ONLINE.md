@@ -18,6 +18,8 @@ By default the game looks for the server at `https://api.chessfront.app`. When t
 - **Leaving:** if your opponent disconnects, their clock keeps running. After 60 seconds you can claim the win. If fewer than two moves have been made, the game is called off instead.
 - **No-shows:** each side has 30 seconds to make its first move, or the game is called off with no rating change.
 - **Draws, resigning and rematches:** offer, accept or decline a draw, and resign. After the game, either player can ask for a rematch; when both agree, it starts with colours swapped.
+- **Reactions:** the 🙂 button by the board sends an emoji (👍 👏 😂 😮 😅 🔥 🧠 😤 🤝 👑) that floats up from your player bar on both screens and for anyone watching. It's a fixed set, so there's nothing to moderate, and the server lets through at most one every 0.7 seconds per player. They work during the game and after it ends.
+- **Voice chat:** the 🎙 button lets the two players talk while they play. Nobody is heard until they switch voice on themselves, and the call only starts once both have. The audio goes straight between the two browsers (WebRTC); the server only passes the call set-up along, never hears it, and spectators never get it. Each player can mute themselves or silence the other, and a green dot on 🎙 shows when the other player is waiting to talk. If a connection drops, voice picks up again by itself, and it carries on into a rematch. Most networks connect directly; a few (some mobile carriers and office networks) need a TURN relay, set with `TURN_URLS` (see [DEPLOY.md](DEPLOY.md)).
 - **Spectators:** anyone can watch a game with `?watch=CODE`, with no account needed. Live games are listed in the lobby's "Watch live" tab, and players see how many people are watching.
 - **Leaderboard:** a table for Blitz and one for Rapid.
 - **Streaks and rivals:** every win adds to your win streak, and a loss or a draw ends it. Your best streak is kept. The result screen shows your all-time score against that opponent ("You 3 – 1 Bram"), and the lobby's Rivals tab lists everyone you've played with the score against each.
@@ -137,6 +139,7 @@ Requests that need you signed in send `Authorization: Bearer <token>`.
 | `GET /api/users/:name` | A player's profile and their last 20 games. |
 | `GET /api/leaderboard?cat=blitz\|rapid` | Top players. |
 | `GET /api/live` | Games in play right now. |
+| `GET /api/ice` | Signed in: the STUN (and TURN, if set) servers browsers use to connect a voice call. |
 | `GET /api/games/:code` | A game's moves and result. |
 | `POST /api/account/password {current, password}` | Change password (signs out other devices). |
 | `POST /api/account/email {email, password}` | Set or remove your email. |
@@ -173,3 +176,9 @@ Requests that need you signed in send `Authorization: Bearer <token>`.
 | `GET /metrics` | Prometheus counters (bearer `METRICS_TOKEN` when set). |
 
 Everything about games goes over a WebSocket at `/online`. The message types are in `packages/chess-core/src/online.ts`.
+
+Reactions and voice use two of them. `{t: 'react', code, emoji}` is broadcast to everyone in the game as `{t: 'react', code, by, emoji}`. `{t: 'voice', code, signal}` is passed only to the other player as `{t: 'voice', code, from, signal}`, where `signal` is one of:
+- `{kind: 'on', on, muted}`: switching voice on or off, or muting;
+- `{kind: 'offer', sdp}` or `{kind: 'answer', sdp}`: the call set-up. White sends the offer once both players are on, and each description carries all its network candidates, so one offer and one answer are enough. Descriptions are only relayed once both players are on voice.
+
+When a player leaves the game or loses connection, the other player is told they're off voice. A player who joins (or rejoins) a game is told if the other player is already on.

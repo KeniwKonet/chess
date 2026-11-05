@@ -11,6 +11,7 @@ import { useClusters } from './clash';
 import { SocialBar, SocialPanels } from './AccountHud';
 import { TournamentsScreen } from './TournamentHud';
 import { AdminScreen } from './AdminHud';
+import { TalkDock, TalkFloats, VoiceBadge } from './TalkHud';
 import { useKingdom } from './store';
 import { director } from './director';
 import { unlockAudio } from './sound';
@@ -170,6 +171,7 @@ function Playing() {
       <Promotion />
       <Moves />
       <OnlineBanner />
+      {kc.opponent === 'online' && <TalkDock />}
       <ClashPanel />
       <GameMenu />
       {kc.opponent === 'online' ? <OnlineResult /> : kc.opponent === 'clash' ? <ClashResult /> : <Result />}
@@ -213,8 +215,12 @@ function PlayerBar({ colour, where }: { colour: Colour; where: 'top' | 'bottom' 
   return (
     <section className={`k-bar panel ${where} side-${colour}${toMove ? ' to-move' : ''}`} aria-label={`${SIDE_NAME[colour]} army`}>
       <span className={`k-avatar side-${colour}`} aria-hidden="true">{GLYPH.k}</span>
+      {kc.opponent === 'online' && <TalkFloats colour={colour} where={where} />}
       <div className="k-who">
-        <div className="k-name">{name}</div>
+        <div className="k-name">
+          {kc.opponent === 'online' && <VoiceBadge colour={colour} />}
+          {name}
+        </div>
         <div className="k-taken" aria-label={`Captured: ${taken.map((p) => ROLE_NAME[p.role]).join(', ') || 'none'}`}>
           {[...taken].sort((a, b) => values[b.role] - values[a.role]).map((p) => (
             <span key={p.id} className={`k-taken-p side-${p.colour}`}>{GLYPH[p.role]}</span>
