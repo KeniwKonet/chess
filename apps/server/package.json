@@ -4,6 +4,7 @@
   "private": true,
   "type": "module",
   "scripts": {
+    "build": "echo \"server runs from TypeScript via tsx; nothing to build\"",
     "start": "tsx src/main.ts"
   },
   "dependencies": {
