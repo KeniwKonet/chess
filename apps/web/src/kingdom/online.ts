@@ -31,6 +31,7 @@ import { handleClash, openClash, useClusters } from './clash';
 import { loadFriends, loadNotes, onNote, openTournament, useSocial } from './social';
 import { handleTalk, talkOff, talkOnGame } from './talk';
 import { PollSocket, type LiveSocket } from './pollsocket';
+import { handleCommunity } from './community';
 
 /**
  * Where the server might be, best guess first. When one server runs everything,
@@ -341,10 +342,12 @@ function reconnect() {
   openSocket();
 }
 
-/** Watching needs no account: those messages may go before sign-in. */
+/** Messages that need no account (watching, reading the community): they may go before sign-in. */
+const preAuth = (m: ClientMsg) => m.t === 'watch' || m.t === 'clash-open' || m.t === 'ping' || m.t === 'chat-open' || m.t === 'chat-close';
+
 function flushWatch() {
   for (let i = 0; i < outbox.length; i++) {
-    if (outbox[i]!.t === 'watch' || outbox[i]!.t === 'clash-open') {
+    if (preAuth(outbox[i]!)) {
       ws!.send(JSON.stringify(outbox[i]));
       outbox.splice(i--, 1);
     }
@@ -352,7 +355,7 @@ function flushWatch() {
 }
 
 export function send(m: ClientMsg) {
-  if (ws && ws.readyState === OPEN && (authed || m.t === 'watch' || m.t === 'clash-open' || m.t === 'ping')) ws.send(JSON.stringify(m));
+  if (ws && ws.readyState === OPEN && (authed || preAuth(m))) ws.send(JSON.stringify(m));
   else {
     outbox.push(m);
     openSocket();
@@ -467,6 +470,11 @@ function handle(m: ServerMsg) {
     case 'react':
     case 'voice':
       return handleTalk(m);
+    case 'chat':
+    case 'chat-new':
+    case 'chat-gone':
+    case 'chat-online':
+      return handleCommunity(m);
   }
 }
 

@@ -174,9 +174,65 @@ export type VoiceSignal =
   | { kind: 'offer'; sdp: string }
   | { kind: 'answer'; sdp: string };
 
+/* ---------------------------------------------------------------- community */
+
+export const CHAT_MAX = 300;
+
+/**
+ * A card a player can post to the community. The server fills it in from its
+ * own records, so a streak or a win can't be made up.
+ */
+export type ChatCard =
+  | { kind: 'streak'; streak: number; best: number }
+  | { kind: 'win'; code: string; opponent: string; opponentRating: number | null; tc: OnlineTc; rated: boolean; reason: string; moves: number }
+  | { kind: 'rating'; category: RatingCategory; rating: number; rank: number | null; provisional: boolean }
+  /** Posted by ChessFront itself when someone reaches a streak milestone. */
+  | { kind: 'milestone'; streak: number };
+
+export interface ChatAuthor {
+  id: number;
+  name: string;
+  /** Profile picture path on the server, or null. */
+  avatar: string | null;
+  rating: number | null;
+  admin: boolean;
+  country: string;
+}
+
+export interface ChatMessage {
+  id: number;
+  at: number;
+  user: ChatAuthor;
+  text: string;
+  card: ChatCard | null;
+}
+
+export interface CommunityBoard {
+  blitz: { name: string; rating: number; provisional: boolean }[];
+  rapid: { name: string; rating: number; provisional: boolean }[];
+  /** Longest current win streaks. */
+  streaks: { name: string; streak: number }[];
+}
+
+export type ChatShare = 'streak' | 'win' | 'rating';
+
+export type CommunityMsg =
+  | { t: 'chat-open' }
+  | { t: 'chat-close' }
+  | { t: 'chat-say'; text: string }
+  | { t: 'chat-share'; what: ChatShare; text?: string }
+  | { t: 'chat-delete'; id: number };
+
+export type CommunityServerMsg =
+  | { t: 'chat'; messages: ChatMessage[]; board: CommunityBoard; online: number }
+  | { t: 'chat-new'; message: ChatMessage }
+  | { t: 'chat-gone'; id: number }
+  | { t: 'chat-online'; online: number };
+
 /* Browser -> server */
 export type ClientMsg =
   | ClashMsg
+  | CommunityMsg
   | { t: 'react'; code: string; emoji: string }
   | { t: 'voice'; code: string; signal: VoiceSignal }
   | { t: 'auth'; token: string }
@@ -199,6 +255,7 @@ export type ClientMsg =
 /* Server -> browser */
 export type ServerMsg =
   | ClashServerMsg
+  | CommunityServerMsg
   | { t: 'ready'; user: PublicUser; unread?: number }
   | { t: 'notify'; note: Notification }
   | { t: 'tournament-game'; tournament: string; code: string }

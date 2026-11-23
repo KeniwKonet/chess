@@ -30,6 +30,7 @@ import {
 import type { Accounts, UserRow } from './accounts';
 import type { Db } from './db';
 import { ClashHub } from './clash';
+import { Community } from './community';
 import type { Clusters } from './clusters';
 import type { Friends, Notifier } from './social';
 import { PROVISIONAL_RD, rate } from './glicko';
@@ -122,6 +123,7 @@ export class Hub {
   private log: (...a: unknown[]) => void;
   private sweeper: NodeJS.Timeout | null = null;
   readonly clash: ClashHub | null = null;
+  readonly community: Community;
   readonly endListeners: GameEndListener[] = [];
   notifier: Notifier | null = null;
   friends: Friends | null = null;
@@ -137,6 +139,7 @@ export class Hub {
     this.firstMoveMs = opts.firstMoveMs ?? (Number(process.env.FIRST_MOVE_MS) || ONLINE_TIMING.firstMove);
     this.log = opts.log ?? console.log;
     if (this.timers) this.sweeper = setInterval(() => this.sweep(), 60_000);
+    this.community = new Community(db, accounts, this.now);
     if (clusters) {
       clusters.online = (id) => this.connsOf(id).length > 0;
       this.clash = new ClashHub(db, accounts, clusters, { now: this.now, timers: this.timers, log: this.log, connsOf: (id) => this.connsOf(id) });
@@ -189,6 +192,7 @@ export class Hub {
     this.conns.delete(c);
     this.unseek(c);
     this.clash?.disconnect(c);
+    this.community.disconnect(c);
     for (const code of c.games) {
       const g = this.games.get(code);
       if (!g) continue;
@@ -220,6 +224,8 @@ export class Hub {
       return c.send({ t: 'ready', user: (await this.accounts.publicUser(u.id))!, unread });
     }
     if (msg.t === 'watch') return this.attach(c, String(msg.code), false);
+    // The community can be read without signing in; posting checks the account itself.
+    if (msg.t.startsWith('chat-')) return this.community.receive(c, msg as Parameters<Community['receive']>[1]);
     if (msg.t.startsWith('clash-')) {
       if (c.user) c.user = (await this.accounts.user(c.user.id)) ?? c.user;
       return this.clash?.receive(c, msg as Parameters<ClashHub['receive']>[1]);
