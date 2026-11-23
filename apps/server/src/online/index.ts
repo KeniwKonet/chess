@@ -25,6 +25,7 @@ import { Hub, type GameRow, type HubOptions } from './hub';
 import { counters, log } from './log';
 import { makeMailer, type Mailer } from './mailer';
 import { Profiles } from './profile';
+import { MAX_SEND, Relay } from './relay';
 import { Friends, Notifier } from './social';
 import { Tournaments } from './tournaments';
 
@@ -35,6 +36,8 @@ export interface Online {
   tournaments: Tournaments;
   admin: Admin;
   wss: WebSocketServer;
+  /** The live connection over plain HTTP. */
+  relay: Relay<ReturnType<Hub['connect']>>;
   handleHttp: (req: IncomingMessage, res: ServerResponse) => boolean;
   close: () => Promise<void>;
 }
@@ -189,6 +192,13 @@ export async function startOnline(server: Server, opts: OnlineOptions = {}): Pro
       chain = chain.then(() => hub.disconnect(conn));
     });
   });
+  // The same connection over plain HTTP, for hosts that block WebSockets (relay.ts).
+  const relay = new Relay(
+    hub,
+    (res, body) => send(res, 200, body),
+    (e) => log.error('online message failed', e),
+  );
+
   server.on('upgrade', (req, socket, head) => {
     const path = (req.url ?? '/').split('?')[0];
     if (path !== '/online') return;
@@ -493,6 +503,28 @@ export async function startOnline(server: Server, opts: OnlineOptions = {}): Pro
 
   const allowed = (process.env.ALLOWED_ORIGINS ?? '*').split(',').map((s) => s.trim());
 
+  async function realtime(req: IncomingMessage, res: ServerResponse, path: string, url: URL) {
+    const id = url.searchParams.get('id') ?? '';
+    const gone = () => send(res, 404, { error: 'This connection has ended.', gone: true });
+    if (path === '/api/rt/open' && req.method === 'POST') return send(res, 200, { id: relay.open() });
+    if (path === '/api/rt/poll' && req.method === 'GET') {
+      const after = Number(url.searchParams.get('after') ?? 0) || 0;
+      if (!relay.poll(id, after, res)) gone();
+      return;
+    }
+    if (path === '/api/rt/send' && req.method === 'POST') {
+      const body = await readBody(req, (MAX_SEND + 1) * MAX_MESSAGE);
+      const msgs = Array.isArray(body.msgs) ? (body.msgs as ClientMsg[]) : [];
+      counters.messages += Math.min(msgs.length, MAX_SEND);
+      return relay.send(id, msgs) ? send(res, 200, { ok: true }) : gone();
+    }
+    if (path === '/api/rt/close' && req.method === 'POST') {
+      relay.close(id);
+      return send(res, 200, { ok: true });
+    }
+    send(res, 404, { error: 'Not found.' });
+  }
+
   /** Handles /api/*, /health and /metrics; returns false for anything else. */
   function handleHttp(req: IncomingMessage, res: ServerResponse): boolean {
     const url = new URL(req.url ?? '/', 'http://x');
@@ -543,6 +575,17 @@ export async function startOnline(server: Server, opts: OnlineOptions = {}): Pro
       res.end(`${lines.join('\n')}\n`);
       return true;
     }
+    if (path.startsWith('/api/rt/')) {
+      realtime(req, res, path, url).catch((e) => {
+        if (e instanceof AuthError) send(res, e.status, { error: e.message });
+        else {
+          counters.errors++;
+          log.error('relay error', { path, error: (e as Error).message });
+          send(res, 500, { error: 'Something went wrong on the server.' });
+        }
+      });
+      return true;
+    }
     api(req, res, path, url).catch((e) => {
       if (e instanceof AuthError) send(res, e.status, { error: e.message });
       else {
@@ -562,7 +605,9 @@ export async function startOnline(server: Server, opts: OnlineOptions = {}): Pro
     admin,
     wss,
     handleHttp,
+    relay,
     close: async () => {
+      relay.stop();
       hub.close();
       tournaments.close();
       if (backupTimer) clearInterval(backupTimer);

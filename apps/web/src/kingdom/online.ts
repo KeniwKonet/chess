@@ -30,6 +30,7 @@ import { toast, useKingdom } from './store';
 import { handleClash, openClash, useClusters } from './clash';
 import { loadFriends, loadNotes, onNote, openTournament, useSocial } from './social';
 import { handleTalk, talkOff, talkOnGame } from './talk';
+import { PollSocket, type LiveSocket } from './pollsocket';
 
 /**
  * Where the server might be, best guess first. When one server runs everything,
@@ -229,7 +230,30 @@ export async function refreshLive() {
 
 /* ---------------------------------------------------------------- socket */
 
-let ws: WebSocket | null = null;
+let ws: LiveSocket | null = null;
+const OPEN = 1;
+const CONNECTING = 0;
+
+/**
+ * WebSocket first; if it can't get through (some hosts and networks block it),
+ * the same connection over plain HTTP (pollsocket.ts) for the rest of the visit.
+ */
+let usePolling = (() => {
+  try {
+    return sessionStorage.getItem('cf-live') === 'http' || typeof WebSocket === 'undefined';
+  } catch {
+    return typeof WebSocket === 'undefined';
+  }
+})();
+let wsFailures = 0;
+function switchToPolling() {
+  usePolling = true;
+  try {
+    sessionStorage.setItem('cf-live', 'http');
+  } catch {
+    /* private mode */
+  }
+}
 let retry = 0;
 let retryTimer: ReturnType<typeof setTimeout> | null = null;
 let authed = false;
@@ -238,7 +262,7 @@ let wantOpen = false;
 
 export function openSocket() {
   wantOpen = true;
-  if (ws && (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING)) return;
+  if (ws && (ws.readyState === OPEN || ws.readyState === CONNECTING)) return;
   if (retryTimer) clearTimeout(retryTimer);
   retryTimer = null;
   useOnline.setState({ link: 'connecting' });
@@ -255,10 +279,16 @@ export function openSocket() {
 let finding = false;
 
 function dial() {
-  if (ws && (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING)) return;
-  const sock = new WebSocket(`${base.replace(/^http/, 'ws')}/online`);
+  if (ws && (ws.readyState === OPEN || ws.readyState === CONNECTING)) return;
+  const sock: LiveSocket = usePolling ? new PollSocket(base) : (new WebSocket(`${base.replace(/^http/, 'ws')}/online`) as unknown as LiveSocket);
   ws = sock;
+  let opened = 0;
+  let heard = false;
+  // A WebSocket that is still not open after a while is stuck behind something: give up on it.
+  const stuck = usePolling ? null : setTimeout(() => sock.readyState === CONNECTING && sock.close(), 8000);
   sock.onopen = () => {
+    if (stuck) clearTimeout(stuck);
+    opened = Date.now();
     retry = 0;
     useOnline.setState({ link: 'open', error: null });
     const token = useOnline.getState().token;
@@ -267,6 +297,7 @@ function dial() {
     ping();
   };
   sock.onmessage = (e) => {
+    heard = true;
     let m: ServerMsg;
     try {
       m = JSON.parse(String(e.data));
@@ -276,9 +307,19 @@ function dial() {
     handle(m);
   };
   sock.onclose = () => {
+    if (stuck) clearTimeout(stuck);
     if (ws !== sock) return;
     ws = null;
     authed = false;
+    if (!usePolling) {
+      // Never opened, or dropped straight away without a word: WebSockets aren't getting through.
+      const failed = !opened || (!heard && Date.now() - opened < 10_000);
+      wsFailures = failed ? wsFailures + 1 : 0;
+      if (wsFailures >= 2 || (!opened && wsFailures >= 1)) {
+        switchToPolling();
+        retry = 0;
+      }
+    }
     if (!wantOpen) return useOnline.setState({ link: 'off' });
     useOnline.setState({ link: 'down' });
     const wait = Math.min(10_000, 800 * 2 ** retry++);
@@ -311,7 +352,7 @@ function flushWatch() {
 }
 
 export function send(m: ClientMsg) {
-  if (ws && ws.readyState === WebSocket.OPEN && (authed || m.t === 'watch' || m.t === 'clash-open' || m.t === 'ping')) ws.send(JSON.stringify(m));
+  if (ws && ws.readyState === OPEN && (authed || m.t === 'watch' || m.t === 'clash-open' || m.t === 'ping')) ws.send(JSON.stringify(m));
   else {
     outbox.push(m);
     openSocket();
@@ -322,7 +363,7 @@ let pingTimer: ReturnType<typeof setInterval> | null = null;
 function ping() {
   if (pingTimer) clearInterval(pingTimer);
   pingTimer = setInterval(() => {
-    if (ws?.readyState === WebSocket.OPEN) ws.send(JSON.stringify({ t: 'ping', at: Date.now() } satisfies ClientMsg));
+    if (ws?.readyState === OPEN) ws.send(JSON.stringify({ t: 'ping', at: Date.now() } satisfies ClientMsg));
   }, 20_000);
 }
 
