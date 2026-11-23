@@ -4,7 +4,7 @@
  */
 import { create } from 'zustand';
 import type { FriendInfo, GameRecord, HeadToHead, Notification, OnlineTc, PublicUser, TournamentDetail, TournamentSummary } from '@cr/chess-core';
-import { ONLINE_BASE, api, joinGame, send, useOnline } from './online';
+import { onlineBase, api, joinGame, send, useOnline } from './online';
 import { toast, useKingdom } from './store';
 
 export type Panel = null | 'notifications' | 'account' | 'friends' | 'profile' | 'report' | 'forgot';
@@ -54,7 +54,7 @@ async function run<T>(fn: () => Promise<T>, ok?: string): Promise<T | null> {
   }
 }
 
-export const avatarUrl = (path: string | null | undefined) => (path ? ONLINE_BASE + path : null);
+export const avatarUrl = (path: string | null | undefined) => (path ? onlineBase() + path : null);
 
 /* ---------------------------------------------------------------- notifications */
 

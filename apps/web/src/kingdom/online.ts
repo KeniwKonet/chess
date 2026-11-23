@@ -4,8 +4,9 @@
  * the board, clocks and players in step with the server, which referees
  * every game.
  *
- * The server address: https://api.chessfront.app, or localhost:8787 when the
- * game itself runs on localhost; `?online=https://…` overrides it for testing.
+ * The server address: this same site when one server runs everything, else
+ * https://api.chessfront.app (whichever answers); localhost:8787 when the game
+ * runs on localhost; `?online=https://…` overrides it for testing.
  */
 import { create } from 'zustand';
 import {
@@ -30,18 +31,53 @@ import { handleClash, openClash, useClusters } from './clash';
 import { loadFriends, loadNotes, onNote, openTournament, useSocial } from './social';
 import { handleTalk, talkOff, talkOnGame } from './talk';
 
-export const ONLINE_BASE = (() => {
-  if (typeof location === 'undefined') return 'http://localhost:8787';
+/**
+ * Where the server might be, best guess first. When one server runs everything,
+ * it is this same site; when the game sits on a static host, it is api.chessfront.app.
+ */
+const CANDIDATES: string[] = (() => {
+  if (typeof location === 'undefined') return ['http://localhost:8787'];
   const q = new URLSearchParams(location.search).get('online');
-  if (q && /^https?:\/\//.test(q)) return q.replace(/\/$/, '');
+  if (q && /^https?:\/\//.test(q)) return [q.replace(/\/$/, '')];
   // During development the game (Vite) and the server run on different ports.
-  if (/^(localhost|127\.|192\.168\.|10\.)/.test(location.hostname)) return location.port === '8787' ? location.origin : `http://${location.hostname}:8787`;
-  // When the server itself serves the game (api.chessfront.app, or a Render/Railway/Fly address), it is the same site.
-  if (/^api\./.test(location.hostname) || /\.(onrender\.com|up\.railway\.app|fly\.dev)$/.test(location.hostname)) return location.origin;
-  // The game on its static host (chessfront.app, previews) reaches the server at api.chessfront.app.
-  return 'https://api.chessfront.app';
+  if (/^(localhost|127\.|192\.168\.|10\.)/.test(location.hostname)) return [location.port === '8787' ? location.origin : `http://${location.hostname}:8787`];
+  const api = 'https://api.chessfront.app';
+  return location.origin === api ? [api] : [location.origin, api];
 })();
-const WS_URL = `${ONLINE_BASE.replace(/^http/, 'ws')}/online`;
+
+let base = CANDIDATES[0]!;
+let found: Promise<string> | null = null;
+
+/** The server address in use (the best guess until `findServer` has answered). */
+export const onlineBase = () => base;
+
+async function answers(url: string): Promise<boolean> {
+  const ctl = new AbortController();
+  const timer = setTimeout(() => ctl.abort(), 6000);
+  try {
+    const r = await fetch(url + '/health', { signal: ctl.signal, cache: 'no-store' });
+    const j = (await r.json()) as { ok?: boolean };
+    return r.ok && j.ok === true;
+  } catch {
+    return false;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+/** Finds which address really has the server (asks each one's /health) and remembers it. */
+function findServer(): Promise<string> {
+  if (CANDIDATES.length === 1) return Promise.resolve(base);
+  if (!found)
+    found = (async () => {
+      for (const c of CANDIDATES) {
+        if (await answers(c)) return (base = c);
+      }
+      found = null; // nobody answered: ask again next time
+      return base;
+    })();
+  return found;
+}
 const TOKEN_KEY = 'cf-token';
 
 export type OnlineView = 'lobby' | 'invite' | 'seeking' | 'join';
@@ -142,7 +178,7 @@ export async function api<T = Record<string, unknown>>(path: string, body?: unkn
   const token = useOnline.getState().token;
   let r: Response;
   try {
-    r = await fetch(ONLINE_BASE + path, {
+    r = await fetch((await findServer()) + path, {
       method: body === undefined ? 'GET' : 'POST',
       headers: { ...(body !== undefined ? { 'content-type': 'application/json' } : {}), ...(token ? { authorization: `Bearer ${token}` } : {}) },
       ...(body !== undefined ? { body: JSON.stringify(body) } : {}),
@@ -207,7 +243,20 @@ export function openSocket() {
   retryTimer = null;
   useOnline.setState({ link: 'connecting' });
   authed = false;
-  const sock = new WebSocket(WS_URL);
+  if (!finding) {
+    finding = true;
+    void findServer().then(() => {
+      finding = false;
+      if (wantOpen) dial();
+    });
+  }
+}
+
+let finding = false;
+
+function dial() {
+  if (ws && (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING)) return;
+  const sock = new WebSocket(`${base.replace(/^http/, 'ws')}/online`);
   ws = sock;
   sock.onopen = () => {
     retry = 0;
