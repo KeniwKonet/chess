@@ -29,6 +29,7 @@ import {
 import { toast, useKingdom } from './store';
 import { shareResult } from './share';
 import { SocialBar } from './AccountHud';
+import { Community } from './CommunityHud';
 import { openPanel, openProfile, openReport } from './social';
 
 const tcLabel = (tc: OnlineTc) => (tc === 'untimed' ? 'No clock' : `${tc.replace('+', ' min + ')} s`);
@@ -193,7 +194,7 @@ function Lobby() {
   const u = s.user;
   const guest = !u || u.guest;
   const canRate = !guest && s.tc !== 'untimed';
-  const [tab, setTab] = useState<'play' | 'watch' | 'ranks' | 'rivals'>('play');
+  const [tab, setTab] = useState<'play' | 'community' | 'watch' | 'ranks' | 'rivals'>('play');
   const [upgrade, setUpgrade] = useState(false);
   return (
     <div className="k-lobby">
@@ -222,9 +223,9 @@ function Lobby() {
       </div>
       {upgrade && u?.guest && <Upgrade onDone={() => setUpgrade(false)} />}
       <div className="seg k-tabs" role="tablist">
-        {(['play', 'watch', 'ranks', 'rivals'] as const).map((t) => (
+        {(['play', 'community', 'watch', 'ranks', 'rivals'] as const).map((t) => (
           <button key={t} role="tab" aria-selected={tab === t} className={`btn${tab === t ? ' on' : ''}`} onClick={() => setTab(t)}>
-            {t === 'play' ? 'Play' : t === 'watch' ? 'Watch' : t === 'ranks' ? 'Leaders' : 'Rivals'}
+            {t === 'play' ? 'Play' : t === 'community' ? 'Community' : t === 'watch' ? 'Watch' : t === 'ranks' ? 'Leaders' : 'Rivals'}
           </button>
         ))}
       </div>
@@ -271,6 +272,7 @@ function Lobby() {
           </div>
         </>
       )}
+      {tab === 'community' && <Community />}
       {tab === 'watch' && <LiveList />}
       {tab === 'ranks' && <Leaderboard />}
       {tab === 'rivals' && u && <Rivals name={u.name} />}

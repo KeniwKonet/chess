@@ -182,3 +182,15 @@ Reactions and voice use two of them. `{t: 'react', code, emoji}` is broadcast to
 - `{kind: 'offer', sdp}` or `{kind: 'answer', sdp}`: the call set-up. White sends the offer once both players are on, and each description carries all its network candidates, so one offer and one answer are enough. Descriptions are only relayed once both players are on voice.
 
 When a player leaves the game or loses connection, the other player is told they're off voice. A player who joins (or rejoins) a game is told if the other player is already on.
+
+
+## Community
+
+The **Community** tab in Play online is one chat room for every player, with a small leaderboard beside it (hot win streaks, top Blitz, top Rapid).
+
+- Anyone can read. Posting needs an account (not a guest) that isn't suspended.
+- **Cards**: players can share their current win streak, their last win, or their rating. The server fills each card in from its own records, so they can't be faked.
+- **Milestones**: when someone reaches 3, 5, 10, 15, 20, 25, 30, 40, 50, 75 or 100 wins in a row, ChessFront posts it.
+- **Limits**: 300 characters, one message every 2.5 seconds and 6 per 30 seconds, no repeats within a minute, no links except chessfront.app.
+- **Moderation**: players can remove their own messages and report others; admins can remove any message (recorded in the audit log).
+- Protocol: `chat-open`, `chat-close`, `chat-say`, `chat-share` (`streak` | `win` | `rating`), `chat-delete`; the server answers with `chat` (last 50 messages, the board, how many are here), `chat-new`, `chat-gone`, `chat-online`. Messages are kept in the `community_messages` table.

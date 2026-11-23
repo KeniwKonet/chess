@@ -480,3 +480,107 @@ describe('the live connection over plain HTTP', () => {
     expect((await get('/api/rt/poll?id=nonsense&after=0')).status).toBe(404);
   });
 });
+
+describe('the community', () => {
+  /** White plays two moves with Black, then Black resigns. */
+  async function playToWin(w: Client, b: Client, code: string) {
+    w.send({ t: 'move', code, ply: 0, move: mv('e2', 'e4') });
+    await b.next('move', (m) => m.code === code && m.ply === 1);
+    b.send({ t: 'move', code, ply: 1, move: mv('e7', 'e5') });
+    await w.next('move', (m) => m.code === code && m.ply === 2);
+    b.send({ t: 'resign', code });
+    await w.next('end', (m) => m.code === code);
+  }
+
+  it('lets anyone read, accounts post, and keeps out guests, links, floods and suspended players', async () => {
+    await boot();
+    const reader = await connect();
+    reader.send({ t: 'chat-open' });
+    const first = await reader.next('chat');
+    expect(first.messages).toEqual([]);
+    expect(first.online).toBe(1);
+
+    const ta = await account('Ada');
+    const a = await connect(ta);
+    a.send({ t: 'chat-open' });
+    await a.next('chat');
+    a.send({ t: 'chat-say', text: '  Hello   everyone!\u0007 ' });
+    const said = await reader.next('chat-new');
+    expect(said.message.text).toBe('Hello everyone!');
+    expect(said.message.user.name).toBe('Ada');
+    expect(said.message.card).toBeNull();
+
+    // Too soon, a repeat, and a link.
+    a.send({ t: 'chat-say', text: 'again' });
+    expect((await a.next('error', (m) => m.code === 'chat')).message).toMatch(/Slow down/);
+    clock += 3000;
+    a.send({ t: 'chat-say', text: 'hello EVERYONE!' });
+    expect((await a.next('error', (m) => m.code === 'chat')).message).toMatch(/just said/);
+    clock += 3000;
+    a.send({ t: 'chat-say', text: 'free stuff at https://spam.example' });
+    expect((await a.next('error', (m) => m.code === 'chat')).message).toMatch(/Links/);
+    clock += 3000;
+    a.send({ t: 'chat-say', text: 'play me at https://chessfront.app/?play=abc' });
+    expect((await reader.next('chat-new')).message.text).toContain('chessfront.app');
+
+    // A guest reads but can't post.
+    const guest = await post('/api/guest');
+    const g = await connect(guest.body.token);
+    g.send({ t: 'chat-say', text: 'hi' });
+    expect((await g.next('error', (m) => m.code === 'chat')).message).toMatch(/account/);
+
+    // Someone new sees the history.
+    const late = await connect();
+    late.send({ t: 'chat-open' });
+    const hist = await late.next('chat');
+    expect(hist.messages.map((m) => m.text)).toEqual(['Hello everyone!', 'play me at https://chessfront.app/?play=abc']);
+
+    // A suspended player can't post.
+    await server!.online!.db.query("update users set banned_until = now() + interval '1 day' where name_key = 'ada'");
+    clock += 3000;
+    a.send({ t: 'chat-say', text: 'still here?' });
+    expect((await a.next('error', (m) => m.code === 'chat')).message).toMatch(/suspended/);
+  });
+
+  it('shares real streaks and wins, congratulates milestones, and lets owners and admins remove messages', async () => {
+    await boot();
+    const { code, w, b, tb } = await pair('5+3', true, ['Ada', 'Bram']);
+    w.send({ t: 'chat-open' });
+    await w.next('chat');
+    // Nothing to share yet.
+    w.send({ t: 'chat-share', what: 'streak' });
+    expect((await w.next('error', (m) => m.code === 'chat')).message).toMatch(/not on a winning streak/);
+
+    await playToWin(w, b, code);
+    w.send({ t: 'chat-share', what: 'streak', text: 'on fire' });
+    const streak = await w.next('chat-new');
+    expect(streak.message.card).toEqual({ kind: 'streak', streak: 1, best: 1 });
+    expect(streak.message.text).toBe('on fire');
+    w.send({ t: 'chat-share', what: 'win' });
+    const win = await w.next('chat-new');
+    expect(win.message.card).toMatchObject({ kind: 'win', code, opponent: 'Bram', rated: true, tc: '5+3' });
+    w.send({ t: 'chat-share', what: 'streak' });
+    expect((await w.next('error', (m) => m.code === 'chat')).message).toMatch(/a moment ago/);
+
+    // Bram can't remove Ada's message; an admin can, and everyone is told.
+    b.send({ t: 'chat-delete', id: streak.message.id });
+    expect((await b.next('error', (m) => m.code === 'chat')).message).toMatch(/your own/);
+    await server!.online!.db.query("update users set is_admin = true where name_key = 'bram'");
+    b.send({ t: 'chat-delete', id: streak.message.id });
+    expect((await w.next('chat-gone')).id).toBe(streak.message.id);
+    expect(tb).toBeTruthy();
+
+    // A third straight win is a milestone: ChessFront posts it.
+    for (let i = 0; i < 2; i++) {
+      w.send({ t: 'invite', tc: '5+3', colour: 'w', rated: false });
+      const { code: c2 } = await w.next('invited');
+      await w.game(c2);
+      b.send({ t: 'join', code: c2 });
+      await b.game(c2);
+      await playToWin(w, b, c2);
+    }
+    const shout = await w.next('chat-new', (m) => m.message.card?.kind === 'milestone');
+    expect(shout.message.card).toEqual({ kind: 'milestone', streak: 3 });
+    expect(shout.message.user.name).toBe('Ada');
+  });
+});

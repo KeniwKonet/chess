@@ -198,6 +198,15 @@ create table if not exists tournaments (
   ended_at timestamptz
 );
 create index if not exists tournaments_status on tournaments(status, starts_at);
+create table if not exists community_messages (
+  id serial primary key,
+  user_id int not null references users(id) on delete cascade,
+  text text not null default '',
+  card text,
+  deleted boolean not null default false,
+  created_at timestamptz not null default now()
+);
+create index if not exists community_recent on community_messages(deleted, id desc);
 create table if not exists tournament_players (
   tournament_id int not null references tournaments(id) on delete cascade,
   user_id int not null references users(id) on delete cascade,

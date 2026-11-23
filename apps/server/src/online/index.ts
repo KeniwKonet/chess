@@ -124,6 +124,9 @@ export async function startOnline(server: Server, opts: OnlineOptions = {}): Pro
     counters.gamesFinished++;
     if (e.tournament) await tournaments.gameEnded({ code: e.code, winner: e.winner, status: e.status, reason: e.reason, ...(e.noShow ? { noShow: e.noShow } : {}) });
     if (e.status === 'over' && e.white && e.black) await admin.checkGame(e.white, e.black, e.rated, e.winner);
+    // A win-streak milestone gets a shout in the community.
+    const winnerId = e.winner === 'w' ? e.white : e.winner === 'b' ? e.black : null;
+    if (e.status === 'over' && winnerId) await hub.community.gameWon(winnerId);
   });
   // Cluster join requests reach the King as a notification.
   const origJoin = clusters.requestJoin.bind(clusters);
