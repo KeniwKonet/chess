@@ -73,7 +73,7 @@ If Orbits can run Node web services, create a **second project** from this same 
 | Node version | 22 |
 | Port | Orbits usually sets `PORT` itself; the server listens on it (default 8787) |
 | Health check path | `/health` |
-| WebSockets | must be allowed (the game uses `/online`) |
+| WebSockets | best allowed (the game uses `/online`); if the host blocks them, the game switches to plain HTTP requests (`/api/rt/…`) by itself |
 
 Then add the environment variables from the table below. Under Domains, add `api.chessfront.app`.
 

@@ -418,3 +418,65 @@ describe('online games', () => {
     expect((await w2.next('move')).san).toBe('c4');
   });
 });
+
+describe('the live connection over plain HTTP', () => {
+  /** A player whose browser can't use WebSockets. */
+  async function httpPlayer(token: string) {
+    const { body } = await post('/api/rt/open');
+    const id = body.id as string;
+    let after = 0;
+    const got: ServerMsg[] = [];
+    const say = (...msgs: ClientMsg[]) => post(`/api/rt/send?id=${id}`, { msgs });
+    const poll = async () => {
+      const r = await get(`/api/rt/poll?id=${id}&after=${after}`);
+      for (const x of r.body.msgs as { n: number; m: ServerMsg }[]) {
+        after = Math.max(after, x.n);
+        got.push(x.m);
+      }
+      return r;
+    };
+    /** Polls until a message of type t arrives (a poll with nothing new waits on the server). */
+    const next = async <T extends ServerMsg['t']>(t: T, pred: (m: Extract<ServerMsg, { t: T }>) => boolean = () => true) => {
+      for (let i = 0; i < 10; i++) {
+        const k = got.findIndex((m) => m.t === t && pred(m as never));
+        if (k >= 0) return got.splice(k, 1)[0] as Extract<ServerMsg, { t: T }>;
+        await poll();
+      }
+      throw new Error(`no ${t}; have ${JSON.stringify(got.map((m) => m.t))}`);
+    };
+    await say({ t: 'auth', token });
+    await next('ready');
+    return { id, say, next, poll };
+  }
+
+  it('plays a whole game against a WebSocket player, keeps messages until they are confirmed, and ends sessions', async () => {
+    await boot();
+    const ta = await account('Ada');
+    const tb = await account('Bram');
+    const a = await connect(ta);
+    const b = await httpPlayer(tb);
+
+    a.send({ t: 'invite', tc: '5+3', colour: 'w', rated: true });
+    const { code } = await a.next('invited');
+    await a.game(code);
+    await b.say({ t: 'join', code });
+    expect((await b.next('game', (m) => m.game.code === code)).game.status).toBe('playing');
+    await a.game(code);
+
+    a.send({ t: 'move', code, ply: 0, move: mv('e2', 'e4') });
+    expect((await b.next('move', (m) => m.ply === 1)).san).toBe('e4');
+    await b.say({ t: 'move', code, ply: 1, move: mv('e7', 'e5') });
+    expect((await a.next('move', (m) => m.ply === 2)).san).toBe('e5');
+
+    // A message is kept until a later poll confirms it: asking again from an older number gets it again.
+    a.send({ t: 'move', code, ply: 2, move: mv('g1', 'f3') });
+    const first = await b.poll();
+    const again = await get(`/api/rt/poll?id=${b.id}&after=${(first.body.msgs as { n: number }[])[0]!.n - 1}`);
+    expect((again.body.msgs as { n: number }[])[0]!.n).toBe((first.body.msgs as { n: number }[])[0]!.n);
+
+    await post(`/api/rt/close?id=${b.id}`);
+    expect((await get(`/api/rt/poll?id=${b.id}&after=0`)).status).toBe(404);
+    expect((await post(`/api/rt/send?id=${b.id}`, { msgs: [{ t: 'ping', at: 1 }] })).status).toBe(404);
+    expect((await get('/api/rt/poll?id=nonsense&after=0')).status).toBe(404);
+  });
+});
