@@ -592,3 +592,12 @@
 @media (max-width: 560px) {
   .k-leads { grid-template-columns: none; }
 }
+
+/* ---------- Hints ---------- */
+.k-hint { position: relative; }
+.k-hint:disabled { opacity: 0.45; }
+.k-hint.busy { animation: k-hint-pulse 0.9s ease-in-out infinite alternate; }
+@keyframes k-hint-pulse { from { box-shadow: 0 0 0 0 rgba(232, 179, 58, 0); } to { box-shadow: 0 0 0 4px rgba(232, 179, 58, 0.45); } }
+@media (prefers-reduced-motion: reduce) { .k-hint.busy { animation: none; outline: 2px solid var(--sun); } }
+.k-hint-n { position: absolute; top: -6px; right: -6px; min-width: 18px; height: 18px; border-radius: 999px; background: var(--sun); color: #120e0a; font-size: 11px; font-weight: 700; display: grid; place-items: center; padding: 0 4px; }
+.k-setup-note { margin: 0; font-size: 13.5px; color: var(--parchment-dim); }

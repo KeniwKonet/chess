@@ -20,7 +20,7 @@ export function computerGameStarted(level: string) {
     .catch(() => null);
 }
 
-export function computerGameEnded(result: 'win' | 'loss' | 'draw' | 'resigned', plies: number) {
+export function computerGameEnded(result: 'win' | 'loss' | 'draw' | 'resigned', plies: number, hints = 0) {
   const pending = game;
   game = null;
   if (!pending) {
@@ -33,12 +33,12 @@ export function computerGameEnded(result: 'win' | 'loss' | 'draw' | 'resigned', 
   void pending.then(async (id) => {
     if (id == null) return;
     try {
-      const r = await api<{ points: number; total: number; level: string; note: string | null }>('/api/computer/end', { id, result, moves: Math.ceil(plies / 2) });
+      const r = await api<{ points: number; total: number; level: string; note: string | null }>('/api/computer/end', { id, result, moves: Math.ceil(plies / 2), hints });
       const u = useOnline.getState().user;
       if (u) useOnline.setState({ user: { ...u, points: r.total } });
       // After the result scene has played.
       setTimeout(() => {
-        if (r.points > 0) toast(`+${r.points} point${r.points === 1 ? '' : 's'} (${LEVEL[r.level] ?? r.level} ${result === 'win' ? 'win' : result === 'draw' ? 'draw' : 'game'}) · ${r.total} in total`, 'good');
+        if (r.points > 0) toast(`+${r.points} point${r.points === 1 ? '' : 's'} (${LEVEL[r.level] ?? r.level} ${result === 'win' ? 'win' : result === 'draw' ? 'draw' : 'game'}${hints ? ', hints used: half points' : ''}) · ${r.total} in total`, 'good');
         else if (r.note) toast(r.note, 'info');
       }, 3500);
     } catch {

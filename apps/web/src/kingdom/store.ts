@@ -20,6 +20,8 @@ export interface KState {
   side: Colour | 'random';
   tc: string;
   flipEachTurn: boolean;
+  /** Coach tips: warn when one of your soldiers can be taken (games on this device). */
+  coach: boolean;
   animSpeed: AnimSpeed;
   icons: boolean;
   sound: boolean;
@@ -38,6 +40,10 @@ export interface KState {
   showHelp: boolean;
   /** The role whose card is shown (tapped piece or help). */
   card: { role: Role; colour: Colour } | null;
+  /** The computer is working out a hint. */
+  hinting: boolean;
+  /** Hints used this game. */
+  hints: number;
 }
 
 export const useKingdom = create<KState>(() => ({
@@ -47,6 +53,7 @@ export const useKingdom = create<KState>(() => ({
   side: saved.side ?? 'w',
   tc: saved.tc ?? 'untimed',
   flipEachTurn: saved.flipEachTurn ?? true,
+  coach: saved.coach ?? true,
   animSpeed: saved.animSpeed ?? 'cinematic',
   icons: saved.icons ?? true,
   sound: saved.sound ?? true,
@@ -63,13 +70,15 @@ export const useKingdom = create<KState>(() => ({
   showMenu: false,
   showHelp: false,
   card: null,
+  hinting: false,
+  hints: 0,
 }));
 
 /** Remember preferences between visits. */
 useKingdom.subscribe((s) => {
   try {
-    const { aiLevel, side, tc, flipEachTurn, animSpeed, icons, sound } = s;
-    localStorage.setItem('cr-kingdom', JSON.stringify({ aiLevel, side, tc, flipEachTurn, animSpeed, icons, sound }));
+    const { aiLevel, side, tc, flipEachTurn, coach, animSpeed, icons, sound } = s;
+    localStorage.setItem('cr-kingdom', JSON.stringify({ aiLevel, side, tc, flipEachTurn, coach, animSpeed, icons, sound }));
   } catch {
     /* private mode: preferences just aren't kept */
   }

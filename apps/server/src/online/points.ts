@@ -11,6 +11,7 @@
  * Against the computer (accounts only; the server times the game itself):
  *   win  Squire 2 · Knight 4 · Lord 7 · Warlord 12
  *   draw half of a win, rounded up · loss 1 · resigned 0
+ *   Using hints halves a game's points (rounded down).
  *   A game must last at least 30 seconds and 5 moves to earn anything,
  *   one computer game at a time, and at most 60 points a day from the computer.
  */
@@ -73,7 +74,7 @@ export class Points {
   }
 
   /** The game is over: record it and award points. */
-  async computerEnd(userId: number, id: unknown, result: unknown, moves: unknown) {
+  async computerEnd(userId: number, id: unknown, result: unknown, moves: unknown, hints: unknown = 0) {
     const r = result as ComputerResult;
     if (!['win', 'loss', 'draw', 'resigned'].includes(r)) throw new PointsError('Unknown result.');
     const m = typeof moves === 'number' && Number.isFinite(moves) ? Math.max(0, Math.min(1000, Math.round(moves))) : 0;
@@ -87,6 +88,11 @@ export class Points {
     const win = COMPUTER_WIN[g.level];
     let earned = r === 'win' ? win : r === 'draw' ? Math.ceil(win / 2) : r === 'loss' ? 1 : 0;
     let note: string | null = null;
+    const helped = typeof hints === 'number' && hints > 0;
+    if (helped && earned > 0) {
+      earned = Math.floor(earned / 2);
+      note = 'Hints used: half points for this game.';
+    }
     if (seconds < MIN_SECONDS || m < MIN_MOVES) {
       earned = 0;
       note = 'Games shorter than 5 moves or 30 seconds don’t earn points.';

@@ -268,7 +268,7 @@ export async function startOnline(server: Server, opts: OnlineOptions = {}): Pro
     if (m === 'POST' && path === '/api/computer/end') {
       const me = await signedIn(req);
       const body = await readBody(req);
-      return send(res, 200, await hub.points.computerEnd(me.id, body.id, body.result, body.moves));
+      return send(res, 200, await hub.points.computerEnd(me.id, body.id, body.result, body.moves, body.hints));
     }
     if (m === 'POST' && path === '/api/track') {
       const body = await readBody(req, 8_000);
