@@ -30,7 +30,8 @@ export function squareAt(x: number, z: number): string | null {
   return `${FILES[f]}${r + 1}`;
 }
 
-export const isLight = (sq: string) => (FILES.indexOf(sq[0]!) + Number(sq[1])) % 2 === 1;
+/** Light squares: h1 and a8 are light, a1 and h8 dark ("light on the right"), so each queen starts on her own colour. */
+export const isLight = (sq: string) => (FILES.indexOf(sq[0]!) + Number(sq[1])) % 2 === 0;
 
 /** Yaw that faces from a to b. */
 export const yawTo = (a: P2, b: P2) => Math.atan2(b.x - a.x, b.z - a.z);

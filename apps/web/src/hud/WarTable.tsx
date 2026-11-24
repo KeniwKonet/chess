@@ -111,7 +111,7 @@ export function WarTable() {
                 <button
                   key={sq}
                   role="gridcell"
-                  className={`sq ${(r + fi) % 2 ? 'light' : 'dark'}${sel === sq ? ' sel' : ''}${targets.has(sq) ? ' target' : ''}${p?.type === 'k' && wt.game.inCheck() && p.color === wt.game.turn ? ' check' : ''}`}
+                  className={`sq ${(r + fi) % 2 ? 'dark' : 'light'}${sel === sq ? ' sel' : ''}${targets.has(sq) ? ' target' : ''}${p?.type === 'k' && wt.game.inCheck() && p.color === wt.game.turn ? ' check' : ''}`}
                   onClick={() => click(sq)}
                   onMouseEnter={() => setHover(sq)}
                   onMouseLeave={() => setHover(null)}
