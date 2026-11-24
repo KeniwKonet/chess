@@ -1,5 +1,5 @@
 /** The admin dashboard: figures, reports, fair-play flags, players, announcements and the audit log. Only admins can open it. */
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useOnline } from './online';
 import { adminDo, adminGet, openProfile, useSocial } from './social';
 import { useKingdom } from './store';
@@ -12,7 +12,7 @@ interface AdminUser { id: number; name: string; guest: boolean; email: string | 
 interface Audit { id: number; admin: string; action: string; details: string; at: string }
 
 const STAT_LABELS: [string, string][] = [
-  ['online', 'Online now'], ['games', 'Games in play'], ['clashes', 'Clashes in play'], ['players', 'Players'], ['newToday', 'New today'],
+  ['online', 'Online now'], ['games', 'Games in play'], ['clashes', 'Clashes in play'], ['players', 'Players'], ['newToday', 'New accounts today'], ['guestsToday', 'New guests today'],
   ['visitorsToday', 'Visitors today'], ['gamesToday', 'Online games today'], ['gamesTotal', 'Online games ever'],
   ['computerToday', 'Computer games today'], ['computerTotal', 'Computer games ever'], ['clusters', 'Clusters'], ['tournaments', 'Tournaments open/running'],
   ['openReports', 'Open reports'], ['openFlags', 'Fair-play flags'], ['suspended', 'Suspended'], ['guests', 'Guest accounts'],
@@ -61,10 +61,20 @@ export function AdminScreen() {
 function useLoad<T>(path: string, pick: (r: any) => T, deps: unknown[] = []) {
   const [data, setData] = useState<T | null>(null);
   const [n, setN] = useState(0);
+  const misses = useRef(0);
   useEffect(() => {
     adminGet<any>(path)
-      .then((r) => setData(pick(r)))
-      .catch((e: Error) => useSocial.setState({ error: e.message }));
+      .then((r) => {
+        setData(pick(r));
+        // Back in touch: clear a message left by an earlier failed refresh.
+        if (misses.current) useSocial.setState({ error: null });
+        misses.current = 0;
+      })
+      .catch((e: Error) => {
+        misses.current++;
+        // A single missed background refresh (a server restart, a blip on mobile data) keeps the figures and says nothing.
+        if (!data || misses.current >= 3) useSocial.setState({ error: e.message });
+      });
   }, [path, n, ...deps]);
   return [data, () => setN((x) => x + 1)] as const;
 }
