@@ -31,6 +31,7 @@ export interface UserRow {
   draws: number;
   streak: number;
   best_streak: number;
+  points: number;
   is_admin: boolean;
   banned_until: string | Date | null;
   ban_reason: string | null;
@@ -42,7 +43,7 @@ export interface UserRow {
   created_at: string | Date;
 }
 
-const USER_COLS = 'id, name, guest, games, wins, losses, draws, streak, best_streak, is_admin, banned_until, ban_reason, deleted, bio, country, avatar_ver, email, created_at';
+const USER_COLS = 'id, name, guest, games, wins, losses, draws, streak, best_streak, points, is_admin, banned_until, ban_reason, deleted, bio, country, avatar_ver, email, created_at';
 /** Sessions end after this long without use. */
 const SESSION_IDLE_DAYS = 90;
 /** Names given admin rights (comma-separated ADMIN_NAMES). */
@@ -194,12 +195,26 @@ export class Accounts {
       guest: u.guest,
       ratings: await this.ratings(id),
       record: { games: u.games, wins: u.wins, losses: u.losses, draws: u.draws, streak: u.streak, bestStreak: u.best_streak },
+      points: Number(u.points ?? 0),
+      computer: await this.computerRecord(id),
       bio: u.bio,
       country: u.country,
       avatar: u.avatar_ver ? `/api/avatars/${u.id}?v=${u.avatar_ver}` : null,
       ...(u.is_admin ? { admin: true } : {}),
       joined: new Date(u.created_at).getTime(),
     };
+  }
+
+  private async computerRecord(id: number) {
+    const rows = await this.db.query<{ result: string; n: string | number }>(
+      "select result, count(*) as n from computer_games where user_id = $1 and status = 'over' group by result",
+      [id],
+    );
+    const by = Object.fromEntries(rows.map((x) => [x.result, Number(x.n)]));
+    const wins = by.win ?? 0;
+    const draws = by.draw ?? 0;
+    const losses = (by.loss ?? 0) + (by.resigned ?? 0);
+    return { games: wins + draws + losses, wins, losses, draws };
   }
 
   /** Results between two players (finished online games), from `a`'s side. */

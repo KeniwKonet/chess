@@ -14,7 +14,7 @@ const saved = (() => {
 })();
 
 export interface KState {
-  screen: 'home' | 'setup' | 'online' | 'clusters' | 'tournaments' | 'admin' | 'playing';
+  screen: 'home' | 'setup' | 'online' | 'community' | 'clusters' | 'tournaments' | 'admin' | 'playing';
   opponent: Opponent;
   aiLevel: AiLevel;
   side: Colour | 'random';

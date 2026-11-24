@@ -405,7 +405,7 @@ function handle(m: ServerMsg) {
     case 'move':
       return onMove(m);
     case 'end':
-      return onEnd(m.code, m.result, m.status, m.ratingChange, m.streaks, m.h2h);
+      return onEnd(m.code, m.result, m.status, m.ratingChange, m.streaks, m.h2h, m.points);
     case 'offer': {
       const g = s.game;
       if (!g || g.code !== m.code) return;
@@ -611,6 +611,7 @@ function onEnd(
   ratingChange?: GameView['ratingChange'],
   streaks?: Record<Colour, number>,
   h2h?: { wins: number; losses: number; draws: number },
+  points?: Record<Colour, number>,
 ) {
   const g = useOnline.getState().game;
   if (!g || g.code !== code) {
@@ -631,6 +632,8 @@ function onEnd(
   director.celebrate(result.winner, kc.game.tracker, result.reason as KingdomResult['reason']);
   void director.queue.then(() => setTimeout(() => useKingdom.setState({ showResult: true }), director.speed ? 1400 : 200));
   useKingdom.setState((k) => ({ rev: k.rev + 1 }));
+  const mine = g.you && points ? points[g.you] : 0;
+  if (mine) setTimeout(() => toast(`+${mine} point${mine === 1 ? '' : 's'} for this game`, 'good'), 3500);
 }
 
 /* ---------------------------------------------------------------- actions */

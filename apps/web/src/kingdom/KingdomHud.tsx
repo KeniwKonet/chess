@@ -6,6 +6,7 @@ import { GLYPH } from './board';
 import { aiColour, choosePromotion, exitToHome, kc, offerDraw, resign, setAnimSpeed, setSound, startGame, takeback } from './controller';
 import { enterOnline, useOnline } from './online';
 import { OnlineBanner, OnlineMenuExtras, OnlineResult, OnlineScreen } from './OnlineHud';
+import { CommunityScreen } from './CommunityHud';
 import { ClashMenuExtras, ClashPanel, ClashResult, ClustersScreen } from './ClusterHud';
 import { useClusters } from './clash';
 import { SocialBar, SocialPanels } from './AccountHud';
@@ -25,6 +26,7 @@ export function KingdomHud() {
       {screen === 'home' && <Home />}
       {screen === 'setup' && <Setup />}
       {screen === 'online' && <OnlineScreen />}
+      {screen === 'community' && <CommunityScreen />}
       {screen === 'clusters' && <ClustersScreen />}
       {screen === 'tournaments' && <TournamentsScreen />}
       {screen === 'admin' && <AdminScreen />}
@@ -65,6 +67,14 @@ function Home() {
           <SocialBar />
         </header>
         <p className="k-lede">Two kingdoms at war, and every soldier moves by the rules of chess. Choose how you want to fight.</p>
+        <button className="k-home-community" onClick={() => useKingdom.setState({ screen: 'community' })}>
+          <span className="k-home-community-icon" aria-hidden="true">💬</span>
+          <span>
+            <b>Community</b>
+            <small>Chat with players, share your streaks and wins, and see who has the most points.</small>
+          </span>
+          <span className="k-home-community-go" aria-hidden="true">→</span>
+        </button>
         <ul className="k-modecards">
           {MODES.map((m) => (
             <li key={m.id}>

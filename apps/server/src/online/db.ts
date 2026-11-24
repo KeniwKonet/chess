@@ -251,6 +251,29 @@ create table if not exists events (
 create index if not exists events_kind_at on events(kind, at);
 create index if not exists events_visitor on events(visitor);
 create unique index if not exists events_once on events(visitor, game, kind) where game is not null;
+alter table users add column if not exists points int not null default 0;
+create table if not exists points_log (
+  id bigserial primary key,
+  user_id int not null references users(id) on delete cascade,
+  delta int not null,
+  reason text not null,
+  details text not null default '{}',
+  at timestamptz not null default now()
+);
+create index if not exists points_log_user on points_log(user_id, at);
+create table if not exists computer_games (
+  id serial primary key,
+  user_id int not null references users(id) on delete cascade,
+  level text not null,
+  status text not null,
+  result text,
+  moves int,
+  seconds int,
+  points int,
+  started_at timestamptz not null default now(),
+  ended_at timestamptz
+);
+create index if not exists computer_games_user on computer_games(user_id, status);
 create table if not exists stats_samples (
   at timestamptz primary key,
   online int not null,

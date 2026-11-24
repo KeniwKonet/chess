@@ -630,3 +630,58 @@ describe('analytics', () => {
     expect(a.online.ever).toBe(0);
   });
 });
+
+describe('points', () => {
+  it('awards points for online games and verified games against the computer, with limits', async () => {
+    await boot();
+    // A rated online game: the winner gets 10, the loser 2, and both are told.
+    const { code, w, b, tw, tb } = await pair('5+3', true, ['Ada', 'Bram']);
+    w.send({ t: 'move', code, ply: 0, move: mv('e2', 'e4') });
+    await b.next('move', (m) => m.code === code && m.ply === 1);
+    b.send({ t: 'move', code, ply: 1, move: mv('e7', 'e5') });
+    await w.next('move', (m) => m.code === code && m.ply === 2);
+    b.send({ t: 'resign', code });
+    const end = await w.next('end', (m) => m.code === code);
+    expect(end.points).toEqual({ w: 10, b: 2 });
+    expect((await get('/api/users/Ada')).body.user.points).toBe(10);
+
+    // Against the computer: signed in only; the server times the game.
+    expect((await post('/api/computer/start', { level: 'knight' })).status).toBe(401);
+    expect((await post('/api/computer/start', { level: 'grandmaster' }, tw)).status).toBe(400);
+    let g = (await post('/api/computer/start', { level: 'knight' }, tw)).body;
+    clock += 5_000;
+    let r = (await post('/api/computer/end', { id: g.id, result: 'win', moves: 3 }, tw)).body;
+    expect(r.points).toBe(0); // too short
+    expect(r.note).toMatch(/30 seconds/);
+    g = (await post('/api/computer/start', { level: 'warlord' }, tw)).body;
+    clock += 10 * 60_000;
+    r = (await post('/api/computer/end', { id: g.id, result: 'win', moves: 34 }, tw)).body;
+    expect(r).toMatchObject({ points: 12, total: 22, level: 'warlord' });
+    // The same game can't be counted twice.
+    expect((await post('/api/computer/end', { id: g.id, result: 'win', moves: 34 }, tw)).status).toBe(409);
+    // Someone else's game can't be ended.
+    g = (await post('/api/computer/start', { level: 'lord' }, tw)).body;
+    expect((await post('/api/computer/end', { id: g.id, result: 'win', moves: 30 }, tb)).status).toBe(409);
+    clock += 60_000;
+    expect((await post('/api/computer/end', { id: g.id, result: 'draw', moves: 30 }, tw)).body.points).toBe(4);
+    g = (await post('/api/computer/start', { level: 'squire' }, tw)).body;
+    clock += 60_000;
+    expect((await post('/api/computer/end', { id: g.id, result: 'resigned', moves: 9 }, tw)).body.points).toBe(0);
+
+    // The daily cap on computer points.
+    let total = 0;
+    for (let i = 0; i < 6; i++) {
+      g = (await post('/api/computer/start', { level: 'warlord' }, tw)).body;
+      clock += 60_000;
+      total += (await post('/api/computer/end', { id: g.id, result: 'win', moves: 30 }, tw)).body.points;
+    }
+    expect(total).toBe(60 - 12 - 4);
+
+    const ada = (await get('/api/users/Ada')).body.user;
+    expect(ada.computer).toEqual({ games: 10, wins: 8, losses: 1, draws: 1 });
+    expect(ada.points).toBe(10 + 60);
+    const board = (await get('/api/leaderboard?cat=points')).body;
+    expect(board.players[0]).toEqual({ name: 'Ada', points: 70 });
+    expect(tb).toBeTruthy();
+  });
+});
