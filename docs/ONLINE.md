@@ -209,3 +209,19 @@ The admin dashboard's **Analytics** tab covers the last 7, 30 or 90 days or 12 m
 - **Day by day:** charts of visitors, computer games, online games, pass-and-play games and new accounts, with a CSV download.
 
 Games against the computer and pass-and-play happen in the browser, so the game reports them to `POST /api/track` (a visit, a game started, a game finished). Each browser has a random visitor id; nothing personal is sent. These counts start from the day this was deployed. Events from automated browsers and from `localhost` aren't sent.
+
+## Points
+
+Players earn points for every finished game, online and against the computer. Points never change a rating; they're a separate score (and can later be spent, e.g. in the Forge). Every change is recorded in `points_log`.
+
+| Game | Win | Draw | Loss |
+| --- | --- | --- | --- |
+| Online, rated | 10 | 5 | 2 |
+| Online, casual | 6 | 3 | 1 |
+| Computer: Squire / Knight / Lord / Warlord | 2 / 4 / 7 / 12 | half a win, rounded up | 1 (0 if you resign) |
+
+Limits, so points can't be farmed:
+- Games against the same opponent earn points for the first 5 in a day.
+- Computer games need an account (guests included). The server times each game (`POST /api/computer/start`, then `/api/computer/end`); a game must last 30 seconds and 5 moves, only one counts at a time, each counts once, and the computer gives at most 60 points a day.
+
+Points show on the lobby card, the profile (with the record against the computer), the **Points** leaderboard (Leaders tab, `GET /api/leaderboard?cat=points`) and the community's "Most points" list. Online players see "+N points" after each game. The community also opens from the home page (the **Community** button).

@@ -1,8 +1,10 @@
-/** The Community tab in Play online: chat, shared cards, and who's on top. */
+/** The community: chat, shared cards, and who's on top. A tab in Play online, and its own screen from the home page. */
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { CHAT_MAX, type ChatCard, type ChatMessage, type ChatShare } from '@cr/chess-core';
 import { closeCommunity, openCommunity, removeMessage, say, shareCard, useCommunity } from './community';
-import { useOnline } from './online';
+import { enterOnline, openSocket, useOnline } from './online';
+import { useKingdom } from './store';
+import { LinkDot } from './OnlineHud';
 import { avatarUrl, openProfile, openReport } from './social';
 
 const TC: Record<string, string> = { '3+2': '3 min + 2 s', '5+3': '5 min + 3 s', '10+5': '10 min + 5 s', '15+10': '15 min + 10 s', untimed: 'no clock' };
@@ -21,6 +23,26 @@ function ago(at: number, now: number) {
   const h = Math.round(m / 60);
   if (h < 24) return `${h}h`;
   return new Date(at).toLocaleDateString(undefined, { day: 'numeric', month: 'short' });
+}
+
+/** The community on its own screen, opened from the home page. */
+export function CommunityScreen() {
+  useEffect(() => {
+    // Reading needs no account, so connect whether or not the player is signed in.
+    openSocket();
+  }, []);
+  return (
+    <div className="k-scrim">
+      <section className="k-setup k-online k-community-screen panel" aria-label="Community">
+        <header className="k-setup-head">
+          <button className="btn icon" aria-label="Back" onClick={() => useKingdom.setState({ screen: 'home' })}>←</button>
+          <h2>Community</h2>
+          <LinkDot />
+        </header>
+        <Community />
+      </section>
+    </div>
+  );
 }
 
 export function Community() {
@@ -106,7 +128,12 @@ export function Community() {
           </div>
         </>
       ) : (
-        <p className="k-chat-note">{me ? 'Make a free account (above) to chat and share your wins. Guests can read along.' : 'Sign in to chat with the community.'}</p>
+        <p className="k-chat-note">
+          {me ? 'Make a free account (in Play online) to chat and share your wins. Guests can read along.' : 'Sign in to chat, share your wins and earn points.'}{' '}
+          {useKingdom.getState().screen === 'community' && (
+            <button className="btn btn-primary" onClick={() => enterOnline()}>{me ? 'Open Play online' : 'Sign in or play as a guest'}</button>
+          )}
+        </p>
       )}
     </div>
   );
@@ -135,6 +162,7 @@ function Leaders() {
   );
   return (
     <div className="k-leads">
+      {col('⭐ Most points', (b.points ?? []).map((p) => ({ name: p.name, value: p.points.toLocaleString() })), 'Win a game to earn points.')}
       {col('🔥 Hot streaks', b.streaks.map((s) => ({ name: s.name, value: `${s.streak}` })), 'Win two in a row to get on here.')}
       {col('Top Blitz', b.blitz.map((r) => ({ name: r.name, value: `${r.rating}${r.provisional ? '?' : ''}` })), 'No rated blitz games yet.')}
       {col('Top Rapid', b.rapid.map((r) => ({ name: r.name, value: `${r.rating}${r.provisional ? '?' : ''}` })), 'No rated rapid games yet.')}

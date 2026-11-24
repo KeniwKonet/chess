@@ -31,6 +31,7 @@ import type { Accounts, UserRow } from './accounts';
 import type { Db } from './db';
 import { ClashHub } from './clash';
 import { Community } from './community';
+import { Points } from './points';
 import type { Clusters } from './clusters';
 import type { Friends, Notifier } from './social';
 import { PROVISIONAL_RD, rate } from './glicko';
@@ -61,6 +62,8 @@ type RatingChange = Record<Colour, { before: number; after: number }>;
 
 interface Live {
   code: string;
+  /** Points each player earned when the game ended. */
+  points?: Record<Colour, number>;
   tc: OnlineTc;
   rated: boolean;
   status: GameStatus;
@@ -124,6 +127,7 @@ export class Hub {
   private sweeper: NodeJS.Timeout | null = null;
   readonly clash: ClashHub | null = null;
   readonly community: Community;
+  readonly points: Points;
   readonly endListeners: GameEndListener[] = [];
   notifier: Notifier | null = null;
   friends: Friends | null = null;
@@ -140,6 +144,7 @@ export class Hub {
     this.log = opts.log ?? console.log;
     if (this.timers) this.sweeper = setInterval(() => this.sweep(), 60_000);
     this.community = new Community(db, accounts, this.now);
+    this.points = new Points(db, this.now);
     if (clusters) {
       clusters.online = (id) => this.connsOf(id).length > 0;
       this.clash = new ClashHub(db, accounts, clusters, { now: this.now, timers: this.timers, log: this.log, connsOf: (id) => this.connsOf(id) });
@@ -664,7 +669,7 @@ export class Hub {
         h2h: await this.accounts.headToHead(g.seats.w.id, g.seats.b.id),
       };
     }
-    this.broadcast(g, { t: 'end', code: g.code, result, status, ...(g.ratingChange ? { ratingChange: g.ratingChange } : {}), ...extra });
+    this.broadcast(g, { t: 'end', code: g.code, result, status, ...(g.ratingChange ? { ratingChange: g.ratingChange } : {}), ...(g.points ? { points: g.points } : {}), ...extra });
     for (const l of this.endListeners)
       await Promise.resolve(
         l({
@@ -694,6 +699,7 @@ export class Hub {
       );
     await col(w.id, winner === 'w' ? 'wins' : winner === 'b' ? 'losses' : 'draws');
     await col(b.id, winner === 'b' ? 'wins' : winner === 'w' ? 'losses' : 'draws');
+    g.points = await this.points.online({ code: g.code, rated: g.rated, white: w.id, black: b.id, winner });
     const cat = ratingCategory(g.tc);
     if (!g.rated || !cat || w.guest || b.guest) return;
     const rw = await this.accounts.glicko(w.id, cat);

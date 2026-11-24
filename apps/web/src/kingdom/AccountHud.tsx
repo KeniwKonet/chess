@@ -303,6 +303,8 @@ function ProfilePanel({ close }: { close: () => void }) {
         <div><b>{u.ratings.rapid.rating}{u.ratings.rapid.rd >= 110 ? '?' : ''}</b><small>Rapid</small></div>
         <div><b>{r ? `${r.wins}–${r.losses}–${r.draws}` : '–'}</b><small>Won–lost–drawn</small></div>
         <div><b>{r?.bestStreak ?? 0}</b><small>Best streak</small></div>
+        <div><b>⭐ {(u.points ?? 0).toLocaleString()}</b><small>Points</small></div>
+        <div><b>{u.computer ? `${u.computer.wins}–${u.computer.losses}–${u.computer.draws}` : '–'}</b><small>vs computer</small></div>
       </div>
       {p.vsYou && <p className="k-h2h">You {p.vsYou.wins} – {p.vsYou.losses} {u.name}{p.vsYou.draws ? ` (${p.vsYou.draws} drawn)` : ''}</p>}
       {p.games.length > 0 && (

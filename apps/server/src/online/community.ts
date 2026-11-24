@@ -269,9 +269,22 @@ export class Community {
         where streak >= 2 and guest = false and deleted = false and (banned_until is null or banned_until < now())
         order by streak desc, best_streak desc limit 5`,
     );
-    const b: CommunityBoard = { blitz: await top('blitz'), rapid: await top('rapid'), streaks: streaks.map((s) => ({ name: s.name, streak: Number(s.streak) })) };
+    const b: CommunityBoard = {
+      blitz: await top('blitz'),
+      rapid: await top('rapid'),
+      streaks: streaks.map((s) => ({ name: s.name, streak: Number(s.streak) })),
+      points: await this.pointsBoard(),
+    };
     this.board = { b, at: this.now() };
     return b;
+  }
+
+  private async pointsBoard() {
+    const rows = await this.db.query<{ name: string; points: number }>(
+      `select name, points from users where guest = false and deleted = false and points > 0
+        and (banned_until is null or banned_until < now()) order by points desc, id limit 5`,
+    );
+    return rows.map((r) => ({ name: r.name, points: Number(r.points) }));
   }
 
   private sayOnline() {

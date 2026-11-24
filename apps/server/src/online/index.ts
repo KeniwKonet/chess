@@ -260,6 +260,16 @@ export async function startOnline(server: Server, opts: OnlineOptions = {}): Pro
 
   async function api(req: IncomingMessage, res: ServerResponse, path: string, url: URL) {
     const m = req.method ?? 'GET';
+    if (m === 'POST' && path === '/api/computer/start') {
+      const me = await signedIn(req);
+      const body = await readBody(req);
+      return send(res, 200, await hub.points.computerStart(me.id, body.level));
+    }
+    if (m === 'POST' && path === '/api/computer/end') {
+      const me = await signedIn(req);
+      const body = await readBody(req);
+      return send(res, 200, await hub.points.computerEnd(me.id, body.id, body.result, body.moves));
+    }
     if (m === 'POST' && path === '/api/track') {
       const body = await readBody(req, 8_000);
       return send(res, 200, { kept: await analytics.track(ip(req), body) });
@@ -313,6 +323,9 @@ export async function startOnline(server: Server, opts: OnlineOptions = {}): Pro
     if (path === '/api/me') {
       const me = await signedIn(req);
       return send(res, 200, { user: await profiles.me(me) });
+    }
+    if (path === '/api/leaderboard' && url.searchParams.get('cat') === 'points') {
+      return send(res, 200, { category: 'points', players: await hub.points.leaderboard() });
     }
     if (path === '/api/leaderboard') {
       const cat = (url.searchParams.get('cat') === 'rapid' ? 'rapid' : 'blitz') as RatingCategory;

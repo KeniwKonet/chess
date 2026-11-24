@@ -79,7 +79,7 @@ export function OnlineScreen() {
   );
 }
 
-function LinkDot() {
+export function LinkDot() {
   const link = useOnline((s) => s.link);
   if (link === 'off') return null;
   const label = link === 'open' ? 'Connected' : link === 'connecting' ? 'Connecting…' : 'Reconnecting…';
@@ -207,6 +207,7 @@ function Lobby() {
             </small>
           )}
           {u?.guest && <small>Guest · casual games</small>}
+          {u && <small className="k-me-points">⭐ {(u.points ?? 0).toLocaleString()} point{u.points === 1 ? '' : 's'}{u.computer && u.computer.games > 0 ? ` · vs computer ${u.computer.wins}W ${u.computer.losses}L ${u.computer.draws}D` : ''}</small>}
           {u?.record && u.record.games > 0 && (
             <small className="k-me-record">
               {u.record.wins}W {u.record.losses}L {u.record.draws}D{u.record.streak > 1 ? ` · 🔥 ${u.record.streak} wins in a row` : ''}
@@ -332,34 +333,47 @@ function LiveList() {
   );
 }
 
+type BoardCat = RatingCategory | 'points';
+type BoardRow = { name: string; rating?: number; points?: number; games?: number; provisional?: boolean };
+
 function Leaderboard() {
-  const [cat, setCat] = useState<RatingCategory>('blitz');
-  const [rows, setRows] = useState<{ name: string; rating: number; games: number; provisional: boolean }[] | null>(null);
+  const [cat, setCat] = useState<BoardCat>('points');
+  const [rows, setRows] = useState<BoardRow[] | null>(null);
   const [err, setErr] = useState<string | null>(null);
   useEffect(() => {
     setRows(null);
-    api<{ players: { name: string; rating: number; games: number; provisional: boolean }[] }>(`/api/leaderboard?cat=${cat}`)
+    api<{ players: BoardRow[] }>(`/api/leaderboard?cat=${cat}`)
       .then((r) => setRows(r.players))
       .catch((e: Error) => setErr(e.message));
   }, [cat]);
+  const label = (c: BoardCat) => (c === 'points' ? 'Points' : catLabel[c]);
   return (
     <div>
       <div className="seg k-tabs small">
-        {(['blitz', 'rapid'] as const).map((c) => (
-          <button key={c} className={`btn${cat === c ? ' on' : ''}`} aria-pressed={cat === c} onClick={() => setCat(c)}>{catLabel[c]}</button>
+        {(['points', 'blitz', 'rapid'] as const).map((c) => (
+          <button key={c} className={`btn${cat === c ? ' on' : ''}`} aria-pressed={cat === c} onClick={() => setCat(c)}>{label(c)}</button>
         ))}
       </div>
+      {cat === 'points' && <p className="k-board-note">Points come from every finished game: online (more for rated games and wins) and against the computer (more for harder levels).</p>}
       {err && <p className="k-error">{err}</p>}
       {!rows && !err && <p className="log-empty">Loading…</p>}
-      {rows && rows.length === 0 && <p className="log-empty k-empty">No rated {catLabel[cat].toLowerCase()} games yet. Be the first on the board.</p>}
+      {rows && rows.length === 0 && (
+        <p className="log-empty k-empty">{cat === 'points' ? 'Nobody has points yet. Win a game to get on the board.' : `No rated ${label(cat).toLowerCase()} games yet. Be the first on the board.`}</p>
+      )}
       {rows && rows.length > 0 && (
         <ol className="k-board">
           {rows.map((r, i) => (
             <li key={r.name}>
               <span className="k-rank">{i + 1}</span>
               <button className="k-board-name k-link-btn" onClick={() => void openProfile(r.name)}>{r.name}</button>
-              <span className="k-board-rating">{r.rating}{r.provisional ? '?' : ''}</span>
-              <small>{r.games} game{r.games === 1 ? '' : 's'}</small>
+              {cat === 'points' ? (
+                <span className="k-board-rating">⭐ {(r.points ?? 0).toLocaleString()}</span>
+              ) : (
+                <>
+                  <span className="k-board-rating">{r.rating}{r.provisional ? '?' : ''}</span>
+                  <small>{r.games} game{r.games === 1 ? '' : 's'}</small>
+                </>
+              )}
             </li>
           ))}
         </ol>

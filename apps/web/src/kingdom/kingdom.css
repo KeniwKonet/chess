@@ -574,3 +574,21 @@
 .k-ana-axis { stroke: rgba(255, 255, 255, 0.18); stroke-width: 1; }
 .k-ana-tick { fill: var(--parchment-dim); font-size: 12px; }
 .k-ana-hours { display: grid; gap: 4px; max-width: 640px; }
+
+/* ---------- Points, and the community from the home page ---------- */
+.k-leads { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.k-board-note { margin: 8px 0 0; font-size: 13px; color: var(--parchment-dim); }
+.k-me-points { color: var(--sun); }
+.k-home-community { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 12px; width: 100%; margin: 4px 0 12px; padding: 12px 16px; min-height: 64px;
+  text-align: left; font: inherit; color: var(--parchment); cursor: pointer; border-radius: 12px; border: 1px solid rgba(232, 179, 58, 0.55);
+  background: linear-gradient(180deg, rgba(232, 179, 58, 0.18), rgba(232, 179, 58, 0.06)); }
+.k-home-community:hover, .k-home-community:focus-visible { border-color: var(--sun); background: linear-gradient(180deg, rgba(232, 179, 58, 0.26), rgba(232, 179, 58, 0.1)); }
+.k-home-community:focus-visible { outline: 2px solid var(--sun); outline-offset: 2px; }
+.k-home-community-icon { font-size: 28px; }
+.k-home-community b { display: block; font-family: var(--font-cond); font-size: 19px; letter-spacing: 0.03em; }
+.k-home-community small { display: block; color: var(--parchment-dim); font-size: 13.5px; line-height: 1.35; }
+.k-home-community-go { font-size: 22px; color: var(--sun); }
+.k-community-screen .k-chat-note .btn { margin-top: 8px; }
+@media (max-width: 560px) {
+  .k-leads { grid-template-columns: none; }
+}

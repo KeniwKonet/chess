@@ -46,6 +46,10 @@ export interface PublicUser {
   ratings: Record<RatingCategory, Rating>;
   /** Games, wins, losses, draws (all finished online games). */
   record?: { games: number; wins: number; losses: number; draws: number; streak: number; bestStreak: number };
+  /** Points earned by playing, online and against the computer. */
+  points?: number;
+  /** Finished games against the computer (signed-in players). */
+  computer?: { games: number; wins: number; losses: number; draws: number };
   bio?: string;
   /** ISO 3166 two-letter country code, or ''. */
   country?: string;
@@ -212,6 +216,8 @@ export interface CommunityBoard {
   rapid: { name: string; rating: number; provisional: boolean }[];
   /** Longest current win streaks. */
   streaks: { name: string; streak: number }[];
+  /** Most points. */
+  points: { name: string; points: number }[];
 }
 
 export type ChatShare = 'streak' | 'win' | 'rating';
@@ -272,6 +278,8 @@ export type ServerMsg =
       ratingChange?: Record<Colour, { before: number; after: number }>;
       /** Each player's win streak after this game. */
       streaks?: Record<Colour, number>;
+      /** Points each player earned for this game. */
+      points?: Record<Colour, number>;
       /** All finished games between these two, from White's side. */
       h2h?: HeadToHead;
     }
