@@ -26,6 +26,10 @@ export const kc = {
   /** Colour(s) the person at this device plays; null when watching an online game. */
   you: 'w' as Colour | 'both' | null,
   ai: null as null | { it: Generator<void, string | null>; started: number; result?: string | null },
+  /** A hint being worked out for the position `fen`. */
+  hint: null as null | { it: Generator<void, string | null>; fen: string },
+  /** Squares of your soldiers the coach has already warned about. */
+  warned: new Set<string>(),
   /** Real time (ms) of the game's clock reference. */
   clockNow: () => performance.now(),
   lastTick: 0,
@@ -52,6 +56,8 @@ export function startGame(opts: { opponent: Opponent; side?: Colour | 'random'; 
   kc.game = new KingdomGame({ timeControl: tc, ...(opts.fen ? { fen: opts.fen } : {}) });
   kc.opponent = opts.opponent;
   kc.ai = null;
+  kc.hint = null;
+  kc.warned = new Set();
   if (kc.opponent === 'online' || opts.opponent === 'online') leaveOnlineGame();
   kc.send = null;
   kc.mayMove = null;
@@ -72,6 +78,8 @@ export function startGame(opts: { opponent: Opponent; side?: Colour | 'random'; 
     showMenu: false,
     card: null,
     viewFrom: kc.you === 'both' ? 'w' : kc.you,
+    hints: 0,
+    hinting: false,
   });
   bump();
   resigned = false;
@@ -158,7 +166,46 @@ function afterMove() {
     const victim = last.colour === 'w' ? 'b' : 'w';
     if (kc.you === 'both' || kc.you === victim) toast('Check! Your King is under attack.', 'warn');
     else toast('Check!', 'good');
-  }
+  } else coachTip();
+  bump();
+}
+
+const CHESS_NAME: Record<Role, string> = { p: 'pawn', n: 'knight', b: 'bishop', r: 'rook', q: 'queen', k: 'king' };
+const named = (r: Role) => `${ROLE_NAME[r]} (${CHESS_NAME[r]})`;
+
+/** Hints and coach tips are for games on this device (never online, where they'd be unfair). */
+export const canGetHelp = () => (kc.opponent === 'ai' || kc.opponent === 'local') && !kc.game.over;
+
+/** Coach tip: after the other side moves, point out a soldier of yours that can now be taken. */
+function coachTip() {
+  const g = kc.game;
+  if (!useKingdom.getState().coach || !canGetHelp()) return;
+  // Against the computer, only on your turn; with two players, for whoever moves next.
+  if (kc.opponent === 'ai' && g.turn !== kc.you) return;
+  const at = g.chess.threatened(g.turn);
+  const fresh = at.find((t) => !kc.warned.has(t.square));
+  kc.warned = new Set(at.map((t) => t.square));
+  if (fresh) toast(`Careful: your ${named(fresh.type as Role)} on ${fresh.square} can be taken.`, 'warn');
+}
+
+/** Ask the computer for a good move for you (games on this device only). */
+export function askHint() {
+  const g = kc.game;
+  if (!canGetHelp() || !humanToMove() || kc.hint || useKingdom.getState().promotion) return;
+  kc.hint = { it: searchKingdom(g.chess.fen, 'lord', () => 0), fen: g.chess.fen };
+  useKingdom.setState({ hinting: true });
+}
+
+function showHint(san: string | null) {
+  const g = kc.game;
+  useKingdom.setState({ hinting: false });
+  const m = san ? g.chess.verboseMoves().find((x) => x.san === san) : null;
+  if (!m) return toast('No hint for this position.', 'info');
+  const piece = g.chess.pieceAt(m.from)!;
+  const prey = m.captured ? `, taking the ${named(m.captured as Role)}` : '';
+  useKingdom.setState((s) => ({ selected: m.from, targets: [m.to], card: { role: piece.type as Role, colour: piece.color }, hints: s.hints + 1 }));
+  sfx('select');
+  toast(`Hint: move your ${named(piece.type as Role)} from ${m.from} to ${m.to}${prey}.`, 'good');
   bump();
 }
 
@@ -170,7 +217,7 @@ function finish() {
   if (kc.opponent === 'ai') {
     const outcome = resigned ? 'resigned' : r.winner == null ? 'draw' : r.winner === kc.you ? 'win' : 'loss';
     trackGameEnd(outcome, g.history.length);
-    computerGameEnded(outcome, g.history.length);
+    computerGameEnded(outcome, g.history.length, useKingdom.getState().hints);
   }
   else if (kc.opponent === 'local') trackGameEnd(r.winner == null ? 'draw' : 'both', g.history.length);
   useKingdom.setState({ result: r, thinking: false });
@@ -257,6 +304,25 @@ export function frame(dt: number) {
     if (left < 10_000 && Math.floor(left / 1000) !== kc.lastTick) {
       kc.lastTick = Math.floor(left / 1000);
       sfx('tick');
+    }
+  }
+
+  // A hint, worked out a little at a time so the board stays smooth.
+  if (kc.hint) {
+    if (g.over || g.chess.fen !== kc.hint.fen) {
+      kc.hint = null;
+      useKingdom.setState({ hinting: false });
+    } else {
+      const t0 = performance.now();
+      let done: string | null | undefined;
+      while (done === undefined && performance.now() - t0 < AI_SLICE_MS) {
+        const r = kc.hint.it.next();
+        if (r.done) done = r.value;
+      }
+      if (done !== undefined) {
+        kc.hint = null;
+        showHint(done);
+      }
     }
   }
 

@@ -49,6 +49,25 @@ export class StandardGame {
       ...(m.promotion ? { promotion: m.promotion } : {}),
     }));
   }
+  /**
+   * Pieces of `colour` (not the king) the other side could win now: attacked and
+   * not defended, or attacked by something worth less. Most valuable first.
+   */
+  threatened(colour: Colour): { square: Square; type: string }[] {
+    const them = colour === 'w' ? 'b' : 'w';
+    const value: Record<string, number> = { p: 1, n: 3, b: 3, r: 5, q: 9, k: 0 };
+    const out: { square: Square; type: string; v: number }[] = [];
+    for (const row of this.chess.board())
+      for (const cell of row) {
+        if (!cell || cell.color !== colour || cell.type === 'k') continue;
+        const attackers = this.chess.attackers(cell.square, them);
+        if (!attackers.length) continue;
+        const defended = this.chess.attackers(cell.square, colour).length > 0;
+        const cheapest = Math.min(...attackers.map((sq) => value[this.chess.get(sq)!.type] ?? 0));
+        if (!defended || cheapest < value[cell.type]!) out.push({ square: cell.square, type: cell.type, v: value[cell.type]! });
+      }
+    return out.sort((a, b) => b.v - a.v).map(({ square, type }) => ({ square, type }));
+  }
   /** Piece on a square, if any. */
   pieceAt(sq: Square): { type: string; color: 'w' | 'b' } | null {
     return this.chess.get(sq) ?? null;

@@ -685,3 +685,14 @@ describe('points', () => {
     expect(tb).toBeTruthy();
   });
 });
+
+describe('hints', () => {
+  it('halves the points of a computer game where hints were used', async () => {
+    await boot();
+    const t = await account('Ada');
+    const g = (await post('/api/computer/start', { level: 'warlord' }, t)).body;
+    clock += 10 * 60_000;
+    const r = (await post('/api/computer/end', { id: g.id, result: 'win', moves: 30, hints: 2 }, t)).body;
+    expect(r).toMatchObject({ points: 6, note: expect.stringMatching(/Hints used/) });
+  });
+});

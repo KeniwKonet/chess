@@ -3,7 +3,7 @@ import { useEffect, useReducer, useState } from 'react';
 import { AI_LEVELS, CHESS_NAME, ROLE_NAME, ROLE_RULE, resultText, TIME_CONTROLS, type AiLevel, type Colour, type Role } from '@cr/chess-core';
 import { useUi } from '../state/ui';
 import { GLYPH } from './board';
-import { aiColour, choosePromotion, exitToHome, kc, offerDraw, resign, setAnimSpeed, setSound, startGame, takeback } from './controller';
+import { aiColour, askHint, canGetHelp, choosePromotion, exitToHome, humanToMove, kc, offerDraw, resign, setAnimSpeed, setSound, startGame, takeback } from './controller';
 import { enterOnline, useOnline } from './online';
 import { OnlineBanner, OnlineMenuExtras, OnlineResult, OnlineScreen } from './OnlineHud';
 import { CommunityScreen } from './CommunityHud';
@@ -142,6 +142,11 @@ function Setup() {
             </button>
           ))}
         </fieldset>
+        <label className="setting">
+          <span>Coach tips: warn me when one of my soldiers can be taken</span>
+          <input type="checkbox" checked={s.coach} onChange={(e) => set({ coach: e.target.checked })} />
+        </label>
+        <p className="k-setup-note">Stuck? Tap 💡 during the game for a hint.{ai ? ' Hints halve the points for that game.' : ''}</p>
         {!ai && (
           <label className="setting">
             <span>Turn the board to whoever's move it is</span>
@@ -247,11 +252,30 @@ function PlayerBar({ colour, where }: { colour: Colour; where: 'top' | 'bottom' 
       )}
       {where === 'bottom' && (
         <div className="k-actions">
+          {canGetHelp() && <HintButton />}
           <button className="btn" onClick={() => useKingdom.setState((s) => ({ showMoves: !s.showMoves }))} aria-label="Moves" aria-pressed={useKingdom.getState().showMoves}>≡</button>
           <button className="btn" onClick={() => useKingdom.setState({ showMenu: true })} aria-label="Game menu">☰</button>
         </div>
       )}
     </section>
+  );
+}
+
+function HintButton() {
+  const hinting = useKingdom((s) => s.hinting);
+  const hints = useKingdom((s) => s.hints);
+  const myTurn = humanToMove();
+  return (
+    <button
+      className={`btn k-hint${hinting ? ' busy' : ''}`}
+      onClick={() => askHint()}
+      disabled={!myTurn || hinting}
+      aria-label={hinting ? 'Finding a hint' : `Hint${hints ? ` (${hints} used)` : ''}`}
+      title={myTurn ? 'Show me a good move' : 'Hints are for your turn'}
+    >
+      {hinting ? '…' : '💡'}
+      {hints > 0 && !hinting && <span className="k-hint-n" aria-hidden="true">{hints}</span>}
+    </button>
   );
 }
 
@@ -377,6 +401,13 @@ function GameMenu() {
           {isOnline && <OnlineMenuExtras close={close} />}
           {isClash && <ClashMenuExtras close={close} />}
           <button className="btn" onClick={() => useKingdom.setState((x) => ({ viewFrom: x.viewFrom === 'w' ? 'b' : 'w' }))}>⟲ Turn the board around</button>
+          {canGetHelp() && humanToMove() && <button className="btn" onClick={() => { askHint(); close(); }}>💡 Show me a good move (hint)</button>}
+          {canGetHelp() && (
+            <label className="setting">
+              <span>Coach tips</span>
+              <input type="checkbox" checked={s.coach} onChange={(e) => useKingdom.setState({ coach: e.target.checked })} />
+            </label>
+          )}
           <button className="btn" onClick={() => useKingdom.setState({ showHelp: true })}>? How each soldier moves</button>
           {!isOnline && !isClash && <button className="btn" onClick={() => exitToHome()}>⌂ Leave to the main menu</button>}
         </div>
