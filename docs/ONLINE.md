@@ -194,3 +194,18 @@ The **Community** tab in Play online is one chat room for every player, with a s
 - **Limits**: 300 characters, one message every 2.5 seconds and 6 per 30 seconds, no repeats within a minute, no links except chessfront.app.
 - **Moderation**: players can remove their own messages and report others; admins can remove any message (recorded in the audit log).
 - Protocol: `chat-open`, `chat-close`, `chat-say`, `chat-share` (`streak` | `win` | `rating`), `chat-delete`; the server answers with `chat` (last 50 messages, the board, how many are here), `chat-new`, `chat-gone`, `chat-online`. Messages are kept in the `community_messages` table.
+
+## Analytics (admin dashboard)
+
+The admin dashboard's **Analytics** tab covers the last 7, 30 or 90 days or 12 months:
+
+- **Visitors:** unique browsers today, this week, this month and all time; visits; returning visitors; phone/tablet/computer; where they came from (referrer, or `?utm_source=` on a shared link).
+- **Games against the computer:** started and finished (all time, today, this week, in the period), how many people played, average length and time, how they ended, and a table by difficulty with the player's win rate.
+- **Pass-and-play games:** the same counts.
+- **Online games:** totals, rated/casual/tournament, games called off, different players, average length and time, clocks chosen, how games ended, which side won, the busiest hours and the most active players.
+- **Players:** accounts, guests, emails, new sign-ups, who signed in today/this week, rated players, suspended and deleted accounts, countries, best win streaks.
+- **Busiest moments:** the most players online at once (sampled every 5 minutes).
+- **Community, tournaments and clusters:** messages, chatters, shared cards, friendships, reports, tournaments and entries, clusters, members, clashes.
+- **Day by day:** charts of visitors, computer games, online games, pass-and-play games and new accounts, with a CSV download.
+
+Games against the computer and pass-and-play happen in the browser, so the game reports them to `POST /api/track` (a visit, a game started, a game finished). Each browser has a random visitor id; nothing personal is sent. These counts start from the day this was deployed. Events from automated browsers and from `localhost` aren't sent.

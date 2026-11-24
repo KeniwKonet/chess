@@ -9,7 +9,10 @@ import { openFromUrl, openSocket, useOnline } from './online';
 import { hideSplash, splashStatus } from '../splash';
 import { kc } from './controller';
 import { director } from './director';
+import { trackVisit } from './analytics';
 import './kingdom.css';
+
+let visited = false;
 
 export function KingdomApp() {
   const loaded = useUi((s) => s.loaded);
@@ -23,6 +26,10 @@ export function KingdomApp() {
     // Both armies stand on the field behind the menus.
     if (director.pieces.size === 0) director.sync(kc.game.tracker);
     document.title = 'ChessFront · The Living Chess Experience';
+    if (!visited) {
+      visited = true;
+      trackVisit();
+    }
     // An invite (?play=…) or spectator (?watch=…) link opens straight into online play.
     // Signed in: connect now, so notifications, challenges and tournament games reach you anywhere in the game.
     if (!openFromUrl() && useOnline.getState().token) openSocket();

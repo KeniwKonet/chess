@@ -234,6 +234,28 @@ create index if not exists tgames_t on tournament_games(tournament_id, round);
 create index if not exists tgames_code on tournament_games(game_code);
 alter table tournament_games add column if not exists replay int not null default 0;
 alter table games add column if not exists tournament text;
+create table if not exists events (
+  id bigserial primary key,
+  at timestamptz not null default now(),
+  visitor text not null,
+  kind text not null,
+  mode text,
+  level text,
+  result text,
+  moves int,
+  seconds int,
+  device text,
+  referrer text,
+  game text
+);
+create index if not exists events_kind_at on events(kind, at);
+create index if not exists events_visitor on events(visitor);
+create unique index if not exists events_once on events(visitor, game, kind) where game is not null;
+create table if not exists stats_samples (
+  at timestamptz primary key,
+  online int not null,
+  games int not null
+);
 `;
 
 export async function openDb(opts: { url?: string; dataDir?: string } = {}): Promise<Db> {

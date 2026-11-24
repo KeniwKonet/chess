@@ -11,6 +11,7 @@ import { director } from './director';
 import { sfx, sound, unlockAudio } from './sound';
 import { toast, useKingdom, type Opponent } from './store';
 import { leaveOnlineGame, onlineDraw, onlineResign } from './online';
+import { trackGameEnd, trackGameStart } from './analytics';
 
 const ANIM_SPEED = { cinematic: 1, quick: 2.2, off: 0 } as const;
 /** The computer never answers faster than this (s), so its moves can be followed. */
@@ -72,6 +73,9 @@ export function startGame(opts: { opponent: Opponent; side?: Colour | 'random'; 
     viewFrom: kc.you === 'both' ? 'w' : kc.you,
   });
   bump();
+  resigned = false;
+  if (opts.opponent === 'ai') trackGameStart('ai', s.aiLevel);
+  else if (opts.opponent === 'local') trackGameStart('local');
   if (kc.opponent === 'ai' && kc.you === 'b') toast('The Sun moves first. The computer opens…');
   else toast(kc.opponent === 'local' ? 'The Sun moves first. Tap a soldier to see where it can go.' : 'Your move. Tap a soldier to see where it can go.', 'good');
 }
@@ -154,9 +158,13 @@ function afterMove() {
   bump();
 }
 
+let resigned = false;
+
 function finish() {
   const g = kc.game;
   const r = g.result!;
+  if (kc.opponent === 'ai') trackGameEnd(resigned ? 'resigned' : r.winner == null ? 'draw' : r.winner === kc.you ? 'win' : 'loss', g.history.length);
+  else if (kc.opponent === 'local') trackGameEnd(r.winner == null ? 'draw' : 'both', g.history.length);
   useKingdom.setState({ result: r, thinking: false });
   director.celebrate(r.winner, g.tracker, r.reason);
   // Show the report once the last scene has played.
@@ -175,6 +183,7 @@ export function resign() {
   const c: Colour = kc.you === 'both' || !kc.you ? g.turn : kc.you;
   g.resign(c);
   useKingdom.setState({ showMenu: false });
+  resigned = kc.opponent === 'ai' && c === kc.you;
   finish();
 }
 

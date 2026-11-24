@@ -26,6 +26,7 @@ import { counters, log } from './log';
 import { makeMailer, type Mailer } from './mailer';
 import { Profiles } from './profile';
 import { MAX_SEND, Relay } from './relay';
+import { Analytics } from './analytics';
 import { Friends, Notifier } from './social';
 import { Tournaments } from './tournaments';
 
@@ -137,6 +138,19 @@ export async function startOnline(server: Server, opts: OnlineOptions = {}): Pro
     return out;
   };
 
+  // What players do in the browser (games against the computer, visits), and how busy the server is.
+  const analytics = new Analytics(db);
+  let sampleTimer: NodeJS.Timeout | null = null;
+  if (timers) {
+    const sample = () => {
+      const live = admin.liveStats();
+      analytics.sample(live.online, live.games).catch((e) => log.error('stats sample failed', e));
+    };
+    sampleTimer = setInterval(sample, 5 * 60_000);
+    sampleTimer.unref();
+    setTimeout(sample, 30_000).unref();
+  }
+
   // Admins named in ADMIN_NAMES.
   for (const n of adminNames()) await db.query('update users set is_admin = true where name_key = $1', [n]);
   await hub.restore();
@@ -246,6 +260,10 @@ export async function startOnline(server: Server, opts: OnlineOptions = {}): Pro
 
   async function api(req: IncomingMessage, res: ServerResponse, path: string, url: URL) {
     const m = req.method ?? 'GET';
+    if (m === 'POST' && path === '/api/track') {
+      const body = await readBody(req, 8_000);
+      return send(res, 200, { kept: await analytics.track(ip(req), body) });
+    }
     if (m === 'POST' && (path === '/api/register' || path === '/api/login' || path === '/api/guest')) {
       if (!authLimit.ok(ip(req))) return send(res, 429, { error: 'Too many tries. Wait a few minutes and try again.' });
       const body = path === '/api/guest' ? {} : await readBody(req);
@@ -388,6 +406,7 @@ export async function startOnline(server: Server, opts: OnlineOptions = {}): Pro
     const action = path.slice('/api/admin/'.length);
     if (m === 'GET') {
       if (action === 'stats') return send(res, 200, { stats: await admin.stats() });
+      if (action === 'analytics') return send(res, 200, { analytics: await analytics.report(Number(url.searchParams.get('days') ?? 30)) });
       if (action === 'reports') return send(res, 200, { reports: await admin.reports(url.searchParams.get('status') === 'resolved' ? 'resolved' : 'open') });
       if (action === 'flags') return send(res, 200, { flags: await admin.flags() });
       if (action === 'users') return send(res, 200, { users: await admin.users(url.searchParams.get('q')) });
@@ -614,6 +633,7 @@ export async function startOnline(server: Server, opts: OnlineOptions = {}): Pro
       hub.close();
       tournaments.close();
       if (backupTimer) clearInterval(backupTimer);
+      if (sampleTimer) clearInterval(sampleTimer);
       for (const c of wss.clients) c.terminate();
       await new Promise<void>((r) => wss.close(() => r()));
       await db.close();
