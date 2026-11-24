@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react';
 import { useOnline } from './online';
 import { adminDo, adminGet, openProfile, useSocial } from './social';
 import { useKingdom } from './store';
+import { Analytics } from './AdminAnalytics';
 
 type Stats = Record<string, number>;
 interface Report { id: number; reason: string; details: string; game: string | null; target: string; targetId: number; reporter: string | null; timesReported: string; at: string }
@@ -12,7 +13,8 @@ interface Audit { id: number; admin: string; action: string; details: string; at
 
 const STAT_LABELS: [string, string][] = [
   ['online', 'Online now'], ['games', 'Games in play'], ['clashes', 'Clashes in play'], ['players', 'Players'], ['newToday', 'New today'],
-  ['gamesToday', 'Games today'], ['gamesTotal', 'Games ever'], ['clusters', 'Clusters'], ['tournaments', 'Tournaments open/running'],
+  ['visitorsToday', 'Visitors today'], ['gamesToday', 'Online games today'], ['gamesTotal', 'Online games ever'],
+  ['computerToday', 'Computer games today'], ['computerTotal', 'Computer games ever'], ['clusters', 'Clusters'], ['tournaments', 'Tournaments open/running'],
   ['openReports', 'Open reports'], ['openFlags', 'Fair-play flags'], ['suspended', 'Suspended'], ['guests', 'Guest accounts'],
 ];
 
@@ -23,7 +25,7 @@ function ErrorLine() {
 
 export function AdminScreen() {
   const user = useOnline((s) => s.user);
-  const [tab, setTab] = useState<'overview' | 'reports' | 'flags' | 'players' | 'audit'>('overview');
+  const [tab, setTab] = useState<'overview' | 'analytics' | 'reports' | 'flags' | 'players' | 'audit'>('overview');
   if (!user?.admin)
     return (
       <div className="k-scrim">
@@ -38,7 +40,7 @@ export function AdminScreen() {
           <h2>Admin</h2>
         </header>
         <div className="seg k-tabs" role="tablist">
-          {(['overview', 'reports', 'flags', 'players', 'audit'] as const).map((t) => (
+          {(['overview', 'analytics', 'reports', 'flags', 'players', 'audit'] as const).map((t) => (
             <button key={t} role="tab" aria-selected={tab === t} className={`btn${tab === t ? ' on' : ''}`} onClick={() => setTab(t)}>
               {t[0]!.toUpperCase() + t.slice(1)}
             </button>
@@ -46,6 +48,7 @@ export function AdminScreen() {
         </div>
         <ErrorLine />
         {tab === 'overview' && <Overview />}
+        {tab === 'analytics' && <Analytics />}
         {tab === 'reports' && <Reports />}
         {tab === 'flags' && <Flags />}
         {tab === 'players' && <Players />}

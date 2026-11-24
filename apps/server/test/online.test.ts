@@ -584,3 +584,49 @@ describe('the community', () => {
     expect(shout.message.user.name).toBe('Ada');
   });
 });
+
+describe('analytics', () => {
+  it('counts games against the computer and visits sent by browsers, and gives admins the full report', async () => {
+    await boot();
+    const v1 = 'visitor-one-1234';
+    const v2 = 'visitor-two-5678';
+    // A visit, then two games against the computer (one won, one resigned) and a pass-and-play game.
+    let r = await post('/api/track', {
+      visitor: v1,
+      events: [
+        { kind: 'visit', device: 'phone', referrer: 'l.facebook.com' },
+        { kind: 'game-start', mode: 'ai', level: 'knight', game: 'gameaaaa1' },
+        { kind: 'game-end', mode: 'ai', level: 'knight', game: 'gameaaaa1', result: 'win', moves: 31, seconds: 600 },
+        { kind: 'game-start', mode: 'ai', level: 'warlord', game: 'gamebbbb2' },
+        { kind: 'game-end', mode: 'ai', level: 'warlord', game: 'gamebbbb2', result: 'resigned', moves: 12, seconds: 200 },
+        // The same event twice is counted once.
+        { kind: 'game-start', mode: 'ai', level: 'warlord', game: 'gamebbbb2' },
+        { kind: 'game-start', mode: 'local', game: 'gamecccc3' },
+        // Not allowed: unknown kinds and modes are dropped.
+        { kind: 'hack', mode: 'ai' },
+        { kind: 'game-start', mode: 'online', game: 'gamedddd4' },
+      ],
+    });
+    expect(r.body.kept).toBe(7);
+    await post('/api/track', { visitor: v2, events: [{ kind: 'visit', device: 'desktop' }, { kind: 'game-start', mode: 'ai', level: 'squire', game: 'gameeeee5' }] });
+    // A bad visitor id keeps nothing.
+    expect((await post('/api/track', { visitor: 'x', events: [{ kind: 'visit' }] })).body.kept).toBe(0);
+
+    const ta = await account('Ada');
+    expect((await get('/api/admin/analytics', ta)).status).toBe(403);
+    await server!.online!.db.query("update users set is_admin = true where name_key = 'ada'");
+    const a = (await get('/api/admin/analytics?days=30', ta)).body.analytics;
+    expect(a.computer).toMatchObject({ started: 3, finished: 2, startedToday: 3, players: 2, avgMoves: 22 });
+    expect(a.computer.levels.find((l: { level: string }) => l.level === 'warlord')).toMatchObject({ started: 1, finished: 1, wins: 0, losses: 1 });
+    expect(a.computer.results).toEqual(expect.arrayContaining([{ result: 'win', n: 1 }, { result: 'resigned', n: 1 }]));
+    expect(a.local).toMatchObject({ started: 1, finished: 0 });
+    expect(a.visitors).toMatchObject({ today: 2, ever: 2, visits: 2 });
+    expect(a.visitors.referrers).toEqual([{ referrer: 'facebook.com', n: 1 }]);
+    expect(a.visitors.devices).toEqual(expect.arrayContaining([{ device: 'phone', n: 1 }, { device: 'desktop', n: 1 }]));
+    expect(a.players.accounts).toBe(1);
+    expect(a.daily).toHaveLength(30);
+    expect(a.daily.at(-1).computer).toBe(3);
+    expect(a.trackingSince).toBeGreaterThan(0);
+    expect(a.online.ever).toBe(0);
+  });
+});
