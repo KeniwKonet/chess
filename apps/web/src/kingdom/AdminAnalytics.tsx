@@ -49,7 +49,10 @@ export function Analytics() {
   const load = () => {
     setBusy(true);
     adminGet<{ analytics: Report }>(`analytics?days=${days}`)
-      .then((x) => setR(x.analytics))
+      .then((x) => {
+        setR(x.analytics);
+        useSocial.setState({ error: null });
+      })
       .catch((e: Error) => useSocial.setState({ error: e.message }))
       .finally(() => setBusy(false));
   };
